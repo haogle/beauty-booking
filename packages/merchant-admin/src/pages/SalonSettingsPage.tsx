@@ -70,7 +70,18 @@ export const SalonSettingsPage: React.FC = () => {
     setSaving(true)
 
     try {
-      const { id, ...updateData } = salon
+      // Only send fields the API DTO accepts (forbidNonWhitelisted is enabled)
+      const updateData = {
+        name: salon.name,
+        email: salon.email,
+        phone: salon.phone,
+        addressLine1: salon.addressLine1,
+        addressLine2: salon.addressLine2 || undefined,
+        city: salon.city,
+        state: salon.state,
+        zipCode: salon.zipCode,
+        country: salon.country || undefined,
+      }
       await api.put('/api/v1/merchant/salon', updateData)
       setSuccess('Salon settings updated successfully!')
       setTimeout(() => setSuccess(''), 5000)
