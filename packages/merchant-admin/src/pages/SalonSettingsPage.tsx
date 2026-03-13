@@ -7,11 +7,12 @@ interface SalonSettings {
   name: string
   email: string
   phone: string
-  address: string
+  addressLine1: string
+  addressLine2?: string
   city: string
   state: string
   zipCode: string
-  description?: string
+  country?: string
 }
 
 export const SalonSettingsPage: React.FC = () => {
@@ -19,11 +20,12 @@ export const SalonSettingsPage: React.FC = () => {
     name: '',
     email: '',
     phone: '',
-    address: '',
+    addressLine1: '',
+    addressLine2: '',
     city: '',
     state: '',
     zipCode: '',
-    description: '',
+    country: '',
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -35,7 +37,10 @@ export const SalonSettingsPage: React.FC = () => {
       try {
         setLoading(true)
         const response = await api.get('/api/v1/merchant/salon')
-        setSalon(response.data || salon)
+        const result = response.data?.data?.data || response.data?.data || response.data
+        if (result) {
+          setSalon((prev) => ({ ...prev, ...result }))
+        }
       } catch (err) {
         if (err instanceof Error) {
           setError(err.message)
@@ -65,7 +70,8 @@ export const SalonSettingsPage: React.FC = () => {
     setSaving(true)
 
     try {
-      await api.put('/api/v1/merchant/salon', salon)
+      const { id, ...updateData } = salon
+      await api.put('/api/v1/merchant/salon', updateData)
       setSuccess('Salon settings updated successfully!')
       setTimeout(() => setSuccess(''), 5000)
     } catch (err) {
@@ -153,14 +159,14 @@ export const SalonSettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="address" className="block text-gray-700 font-semibold mb-2">
+                <label htmlFor="addressLine1" className="block text-gray-700 font-semibold mb-2">
                   Address *
                 </label>
                 <input
-                  id="address"
+                  id="addressLine1"
                   type="text"
-                  name="address"
-                  value={salon.address}
+                  name="addressLine1"
+                  value={salon.addressLine1}
                   onChange={handleChange}
                   required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -214,17 +220,17 @@ export const SalonSettingsPage: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="description" className="block text-gray-700 font-semibold mb-2">
-                Description
+              <label htmlFor="country" className="block text-gray-700 font-semibold mb-2">
+                Country
               </label>
-              <textarea
-                id="description"
-                name="description"
-                value={salon.description || ''}
+              <input
+                id="country"
+                type="text"
+                name="country"
+                value={salon.country || ''}
                 onChange={handleChange}
-                rows={4}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Describe your salon..."
+                placeholder="e.g. US, CN"
               />
             </div>
 
