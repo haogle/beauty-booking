@@ -7,9 +7,11 @@ import { SalonModule } from './modules/salon/salon.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [DatabaseModule, AuthModule, PlatformModule, SalonModule],
+  controllers: [AppController],
   providers: [
     {
       provide: APP_FILTER,
