@@ -1,0 +1,17 @@
+{
+  "name": "beauty-booking",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace=packages/api",
+    "dev:merchant": "npm run dev --workspace=packages/merchant-admin",
+    "dev:platform": "npm run dev --workspace=packages/platform-admin",
+    "db:migrate": "npm run migrate:dev --workspace=packages/api",
+    "db:generate": "npm run generate --workspace=packages/api",
+    "build:api": "npm run build --workspace=packages/api"
+  }
+}
