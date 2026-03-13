@@ -20,8 +20,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       username,
       password,
     })
-    const { token: newToken } = response.data
+    // API response shape: { data: { data: { accessToken, refreshToken, ... } } }
+    const result = response.data?.data?.data || response.data?.data || response.data
+    const newToken = result.accessToken || result.token
+    if (!newToken) {
+      throw new Error('No token received from server')
+    }
     localStorage.setItem('auth_token', newToken)
+    if (result.refreshToken) {
+      localStorage.setItem('refresh_token', result.refreshToken)
+    }
     setToken(newToken)
   }, [])
 

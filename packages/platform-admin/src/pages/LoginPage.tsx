@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [username, setUsername] = useState('platform_admin')
+  const [password, setPassword] = useState('platform123')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const { login } = useAuth()
@@ -16,10 +16,10 @@ const LoginPage: React.FC = () => {
     setIsLoading(true)
 
     try {
-      await login(email, password)
+      await login(username, password)
       navigate('/dashboard')
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid credentials')
+      setError(err.response?.data?.message || err.message || 'Invalid credentials')
     } finally {
       setIsLoading(false)
     }
@@ -43,15 +43,15 @@ const LoginPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address
+                Username
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="admin@example.com"
+                placeholder="Enter your username"
               />
             </div>
 
@@ -77,14 +77,6 @@ const LoginPage: React.FC = () => {
               {isLoading ? 'Logging in...' : 'Login'}
             </button>
           </form>
-
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-gray-600">
-              <span className="font-semibold">Demo credentials:</span>
-            </p>
-            <p className="text-sm text-gray-600">Email: admin@example.com</p>
-            <p className="text-sm text-gray-600">Password: password123</p>
-          </div>
         </div>
       </div>
     </div>

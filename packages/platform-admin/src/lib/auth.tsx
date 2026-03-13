@@ -1,63 +1,51 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import api from './api'
 
-interface User {
-  id: string
-  email: string
-  name: string
-  role: string
-}
-
 interface AuthContextType {
-  user: User | null
   token: string | null
   isLoading: boolean
-  login: (email: string, password: string) => Promise<void>
+  isAuthenticated: boolean
+  login: (username: string, password: string) => Promise<void>
   logout: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('token')
-    const savedUser = localStorage.getItem('user')
-
-    if (savedToken && savedUser) {
+    const savedToken = localStorage.getItem('platform_token')
+    if (savedToken) {
       setToken(savedToken)
-      setUser(JSON.parse(savedUser))
     }
-
     setIsLoading(false)
   }, [])
 
-  const login = async (email: string, password: string) => {
-    try {
-      const response = await api.post('/api/v1/auth/login', { email, password })
-      const { token: newToken, user: userData } = response.data
-
-      setToken(newToken)
-      setUser(userData)
-      localStorage.setItem('token', newToken)
-      localStorage.setItem('user', JSON.stringify(userData))
-    } catch (error) {
-      throw error
+  const login = async (username: string, password: string) => {
+    const response = await api.post('/api/v1/merchant/auth/login', { username, password })
+    // API response shape: { data: { data: { accessToken, refreshToken, ... } } }
+    const result = response.data?.data?.data || response.data?.data || response.data
+    const newToken = result.accessToken || result.token
+    if (!newToken) {
+      throw new Error('No token received from server')
+    }
+    setToken(newToken)
+    localStorage.setItem('platform_token', newToken)
+    if (result.refreshToken) {
+      localStorage.setItem('platform_refresh_token', result.refreshToken)
     }
   }
 
   const logout = () => {
-    setUser(null)
     setToken(null)
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    localStorage.removeItem('platform_token')
+    localStorage.removeItem('platform_refresh_token')
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ token, isLoading, isAuthenticated: !!token, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

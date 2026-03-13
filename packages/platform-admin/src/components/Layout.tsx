@@ -7,7 +7,7 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, logout } = useAuth()
+  const { logout } = useAuth()
   const location = useLocation()
 
   const isActive = (path: string) => {
@@ -58,8 +58,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         <div className="absolute bottom-0 w-64 p-4 border-t border-gray-200 bg-white">
           <div className="text-sm text-gray-600 mb-3">
-            <p className="font-semibold">{user?.name}</p>
-            <p className="text-xs text-gray-500">{user?.email}</p>
+            <p className="font-semibold">Platform Admin</p>
           </div>
           <button
             onClick={logout}
