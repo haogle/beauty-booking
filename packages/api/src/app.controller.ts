@@ -108,6 +108,15 @@ export class AppController {
       [platformAccountId, platformCustomerId, 'platform_admin', platformPasswordHash, 'Platform Admin', randomUUID(), 'ACTIVE', now, now],
     );
 
+    // 9. Create platform admin staff record (needed for auth)
+    const platformStaffId = randomUUID();
+    await this.db.run(
+      `INSERT INTO staff (id, salon_id, account_id, name, role, is_active, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (id) DO NOTHING`,
+      [platformStaffId, salonId, platformAccountId, 'Platform Admin', 'OWNER', 1, 0, now, now],
+    );
+
     return {
       message: 'Database seeded successfully',
       seeded: true,
@@ -116,5 +125,47 @@ export class AppController {
         platform: { username: 'platform_admin', password: 'platform123' },
       },
     };
+  }
+
+  /**
+   * POST /fix-platform-staff
+   * One-time fix: create missing staff record for platform_admin account
+   */
+  @Post('fix-platform-staff')
+  async fixPlatformStaff() {
+    // Find the platform_admin account
+    const account = await this.db.get<any>(
+      `SELECT a.id as account_id, a.username FROM accounts a WHERE a.username = ?`,
+      ['platform_admin'],
+    );
+
+    if (!account) {
+      return { message: 'platform_admin account not found', fixed: false };
+    }
+
+    // Check if staff record already exists
+    const existingStaff = await this.db.get<any>(
+      `SELECT id FROM staff WHERE account_id = ?`,
+      [account.account_id],
+    );
+
+    if (existingStaff) {
+      return { message: 'Staff record already exists', fixed: false, staffId: existingStaff.id };
+    }
+
+    // Get any salon to associate with (use the first one)
+    const salon = await this.db.get<any>(`SELECT id FROM salons LIMIT 1`);
+    const salonId = salon?.id || randomUUID();
+
+    const now = new Date().toISOString();
+    const staffId = randomUUID();
+
+    await this.db.run(
+      `INSERT INTO staff (id, salon_id, account_id, name, role, is_active, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [staffId, salonId, account.account_id, 'Platform Admin', 'OWNER', 1, 0, now, now],
+    );
+
+    return { message: 'Staff record created for platform_admin', fixed: true, staffId };
   }
 }
