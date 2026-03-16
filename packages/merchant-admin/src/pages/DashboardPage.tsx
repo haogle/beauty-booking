@@ -3,9 +3,12 @@ import api from '../lib/api'
 import { Layout } from '../components/Layout'
 
 interface DashboardStats {
+  todayBookings?: number
   totalBookings?: number
   upcomingBookings?: number
+  totalClients?: number
   totalCustomers?: number
+  monthRevenue?: number
   revenue?: number
 }
 
@@ -18,7 +21,7 @@ export const DashboardPage: React.FC = () => {
     const fetchStats = async () => {
       try {
         setLoading(true)
-        const response = await api.get('/api/v1/merchant/dashboard/stats')
+        const response = await api.get('/api/v1/merchant/salon/dashboard/stats')
         const result = response.data?.data || response.data
         setStats(result || {})
       } catch (err) {
@@ -52,10 +55,10 @@ export const DashboardPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-gray-600 text-sm font-semibold uppercase tracking-wide">
-                Total Bookings
+                Today's Bookings
               </h3>
               <p className="text-3xl font-bold text-gray-800 mt-2">
-                {stats.totalBookings || 0}
+                {stats.todayBookings || 0}
               </p>
             </div>
 
@@ -73,16 +76,16 @@ export const DashboardPage: React.FC = () => {
                 Total Customers
               </h3>
               <p className="text-3xl font-bold text-green-600 mt-2">
-                {stats.totalCustomers || 0}
+                {stats.totalClients || stats.totalCustomers || 0}
               </p>
             </div>
 
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-gray-600 text-sm font-semibold uppercase tracking-wide">
-                Revenue
+                Monthly Revenue
               </h3>
               <p className="text-3xl font-bold text-purple-600 mt-2">
-                ${(stats.revenue || 0).toFixed(2)}
+                ${Number(stats.monthRevenue || stats.revenue || 0).toFixed(2)}
               </p>
             </div>
           </div>
