@@ -4,13 +4,14 @@ import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PlatformModule } from './platform/platform.module';
 import { SalonModule } from './modules/salon/salon.module';
+import { PublicModule } from './modules/public/public.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { AppController } from './app.controller';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, PlatformModule, SalonModule],
+  imports: [DatabaseModule, AuthModule, PlatformModule, SalonModule, PublicModule],
   controllers: [AppController],
   providers: [
     {

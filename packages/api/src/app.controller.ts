@@ -168,4 +168,154 @@ export class AppController {
 
     return { message: 'Staff record created for platform_admin', fixed: true, staffId };
   }
+
+  /**
+   * POST /seed-demo
+   * Seed demo services, categories, staff, and staff-service mappings
+   */
+  @Post('seed-demo')
+  async seedDemo() {
+    const salon = await this.db.get<any>(`SELECT id FROM salons WHERE subdomain = ?`, ['serenity']);
+    if (!salon) {
+      return { message: 'Salon not found. Run /seed first.', seeded: false };
+    }
+    const salonId = salon.id;
+
+    const existingCat = await this.db.get('SELECT id FROM service_categories WHERE salon_id = ?', [salonId]);
+    if (existingCat) {
+      return { message: 'Demo data already seeded', seeded: false };
+    }
+
+    const now = new Date().toISOString();
+
+    // Service Categories
+    const catNails = randomUUID();
+    const catHair = randomUUID();
+    const catSkin = randomUUID();
+    const catLash = randomUUID();
+
+    const categories = [
+      { id: catNails, name: 'Nail Services', sortOrder: 1 },
+      { id: catHair, name: 'Hair Services', sortOrder: 2 },
+      { id: catSkin, name: 'Skin Care', sortOrder: 3 },
+      { id: catLash, name: 'Lash & Brow', sortOrder: 4 },
+    ];
+
+    for (const cat of categories) {
+      await this.db.run(
+        `INSERT INTO service_categories (id, salon_id, name, sort_order, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        [cat.id, salonId, cat.name, cat.sortOrder, 1, now],
+      );
+    }
+
+    // Services
+    const services = [
+      { id: randomUUID(), catId: catNails, name: 'Classic Manicure', desc: 'Nail shaping, cuticle care, hand massage, and polish', price: 35, duration: 30, sort: 1 },
+      { id: randomUUID(), catId: catNails, name: 'Gel Manicure', desc: 'Long-lasting gel polish with UV cure, includes cuticle care', price: 50, duration: 45, sort: 2 },
+      { id: randomUUID(), catId: catNails, name: 'Classic Pedicure', desc: 'Foot soak, nail shaping, callus removal, and polish', price: 45, duration: 45, sort: 3 },
+      { id: randomUUID(), catId: catNails, name: 'Deluxe Pedicure', desc: 'Full pedicure with hot stone massage and paraffin treatment', price: 65, duration: 60, sort: 4 },
+      { id: randomUUID(), catId: catNails, name: 'Nail Art (per nail)', desc: 'Custom nail art design per nail', price: 8, duration: 10, sort: 5 },
+      { id: randomUUID(), catId: catHair, name: "Women's Haircut", desc: 'Wash, cut, and blowdry', price: 65, duration: 60, sort: 1 },
+      { id: randomUUID(), catId: catHair, name: "Men's Haircut", desc: "Classic men's cut with styling", price: 35, duration: 30, sort: 2 },
+      { id: randomUUID(), catId: catHair, name: 'Balayage', desc: 'Hand-painted highlights for a natural, sun-kissed look', price: 180, duration: 150, sort: 3 },
+      { id: randomUUID(), catId: catHair, name: 'Blowout & Style', desc: 'Professional blowdry and styling', price: 45, duration: 45, sort: 4 },
+      { id: randomUUID(), catId: catSkin, name: 'Classic Facial', desc: 'Deep cleansing, exfoliation, and hydration', price: 85, duration: 60, sort: 1 },
+      { id: randomUUID(), catId: catSkin, name: 'Anti-Aging Facial', desc: 'Targeted treatment with retinol and peptides', price: 120, duration: 75, sort: 2 },
+      { id: randomUUID(), catId: catSkin, name: 'Chemical Peel', desc: 'Professional-grade exfoliation for skin renewal', price: 95, duration: 45, sort: 3 },
+      { id: randomUUID(), catId: catLash, name: 'Lash Extensions - Classic', desc: 'Individual lash extensions for a natural look', price: 150, duration: 120, sort: 1 },
+      { id: randomUUID(), catId: catLash, name: 'Lash Extensions - Volume', desc: 'Full volume lash fans for a dramatic look', price: 200, duration: 150, sort: 2 },
+      { id: randomUUID(), catId: catLash, name: 'Brow Shaping', desc: 'Professional brow wax and tint', price: 30, duration: 20, sort: 3 },
+    ];
+
+    for (const svc of services) {
+      await this.db.run(
+        `INSERT INTO services (id, salon_id, category_id, name, description, price, duration, is_active, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [svc.id, salonId, svc.catId, svc.name, svc.desc, svc.price, svc.duration, 1, svc.sort, now, now],
+      );
+    }
+
+    // Service Addons
+    const gelManicure = services.find(s => s.name === 'Gel Manicure')!;
+    const deluxePedi = services.find(s => s.name === 'Deluxe Pedicure')!;
+    const classicFacial = services.find(s => s.name === 'Classic Facial')!;
+
+    const addons = [
+      { serviceId: gelManicure.id, name: 'Chrome Finish', price: 15, duration: 10, sort: 1 },
+      { serviceId: gelManicure.id, name: 'French Tips', price: 10, duration: 10, sort: 2 },
+      { serviceId: deluxePedi.id, name: 'Aromatherapy Upgrade', price: 15, duration: 10, sort: 1 },
+      { serviceId: classicFacial.id, name: 'LED Light Therapy', price: 25, duration: 15, sort: 1 },
+      { serviceId: classicFacial.id, name: 'Collagen Mask', price: 20, duration: 10, sort: 2 },
+    ];
+
+    for (const addon of addons) {
+      await this.db.run(
+        `INSERT INTO service_addons (id, service_id, salon_id, name, price, duration, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [randomUUID(), addon.serviceId, salonId, addon.name, addon.price, addon.duration, addon.sort],
+      );
+    }
+
+    // Staff Members
+    const staffMembers = [
+      { id: randomUUID(), name: 'Emily Chen', role: 'TECHNICIAN', gender: 'FEMALE', bio: 'Senior nail technician with 8 years of experience. Specializes in nail art and gel extensions.' },
+      { id: randomUUID(), name: 'Sarah Johnson', role: 'TECHNICIAN', gender: 'FEMALE', bio: 'Licensed esthetician passionate about skincare. Expert in anti-aging treatments.' },
+      { id: randomUUID(), name: 'Mike Rodriguez', role: 'TECHNICIAN', gender: 'MALE', bio: 'Award-winning hair stylist with a passion for creative color techniques.' },
+      { id: randomUUID(), name: 'Lisa Wang', role: 'TECHNICIAN', gender: 'FEMALE', bio: 'Certified lash artist. Trained in both classic and volume techniques.' },
+      { id: randomUUID(), name: 'Jessica Park', role: 'RECEPTIONIST', gender: 'FEMALE', bio: 'Versatile stylist skilled in both hair and nail services.' },
+    ];
+
+    for (let i = 0; i < staffMembers.length; i++) {
+      const s = staffMembers[i];
+      await this.db.run(
+        `INSERT INTO staff (id, salon_id, name, role, gender, bio, is_active, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [s.id, salonId, s.name, s.role, s.gender, s.bio, 1, i + 1, now, now],
+      );
+    }
+
+    // Staff Work Hours (Mon-Sat working, Sun off)
+    for (const s of staffMembers) {
+      for (let day = 0; day < 7; day++) {
+        const isOff = day === 0 ? 1 : 0;
+        await this.db.run(
+          `INSERT INTO staff_work_hours (id, staff_id, salon_id, day_of_week, start_time, end_time, is_off) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (staff_id, day_of_week) DO NOTHING`,
+          [randomUUID(), s.id, salonId, day, '09:00', '18:00', isOff],
+        );
+      }
+    }
+
+    // Staff-Service Mappings
+    const nailServices = services.filter(s => s.catId === catNails);
+    const skinServices = services.filter(s => s.catId === catSkin);
+    const hairServices = services.filter(s => s.catId === catHair);
+    const lashServices = services.filter(s => s.catId === catLash);
+
+    // Emily: nails, Sarah: skin, Mike: hair, Lisa: lash, Jessica: nails+hair
+    const staffServiceMap = [
+      { staff: staffMembers[0], services: nailServices },
+      { staff: staffMembers[1], services: skinServices },
+      { staff: staffMembers[2], services: hairServices },
+      { staff: staffMembers[3], services: lashServices },
+      { staff: staffMembers[4], services: [...nailServices, ...hairServices] },
+    ];
+
+    for (const mapping of staffServiceMap) {
+      for (const svc of mapping.services) {
+        await this.db.run(
+          `INSERT INTO staff_services (staff_id, service_id, salon_id) VALUES (?, ?, ?) ON CONFLICT (staff_id, service_id) DO NOTHING`,
+          [mapping.staff.id, svc.id, salonId],
+        );
+      }
+    }
+
+    // Update Sunday hours to open 10-16
+    await this.db.run(
+      `UPDATE business_hours SET open_time = ?, close_time = ?, is_closed = ? WHERE salon_id = ? AND day_of_week = ?`,
+      ['10:00', '16:00', 0, salonId, 0],
+    );
+
+    return {
+      message: 'Demo data seeded successfully',
+      seeded: true,
+      data: { categories: categories.length, services: services.length, addons: addons.length, staff: staffMembers.length },
+    };
+  }
 }
