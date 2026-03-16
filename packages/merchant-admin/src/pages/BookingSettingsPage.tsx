@@ -3,29 +3,24 @@ import api from '../lib/api'
 import { Layout } from '../components/Layout'
 
 interface BookingSettings {
-  id?: string
-  minAdvanceBookingDays?: number
-  maxAdvanceBookingDays?: number
-  minCancellationHours?: number
-  minRescheduleHours?: number
-  allowOnlineCancellation?: boolean
-  allowOnlineReschedule?: boolean
-  requirePhoneVerification?: boolean
-  enableAutoConfirmation?: boolean
-  bufferTimeBetweenBookings?: number
+  bufferMinutes?: number
+  minAdvanceMinutes?: number
+  allowMultiService?: boolean
+  allowMultiPerson?: boolean
+  smsVerification?: boolean
+  assignmentStrategy?: string
+  allowGenderFilter?: boolean
 }
 
 export const BookingSettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<BookingSettings>({
-    minAdvanceBookingDays: 0,
-    maxAdvanceBookingDays: 30,
-    minCancellationHours: 24,
-    minRescheduleHours: 24,
-    allowOnlineCancellation: true,
-    allowOnlineReschedule: true,
-    requirePhoneVerification: false,
-    enableAutoConfirmation: false,
-    bufferTimeBetweenBookings: 0,
+    bufferMinutes: 0,
+    minAdvanceMinutes: 60,
+    allowMultiService: false,
+    allowMultiPerson: false,
+    smsVerification: false,
+    assignmentStrategy: 'COUNT',
+    allowGenderFilter: false,
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -37,10 +32,18 @@ export const BookingSettingsPage: React.FC = () => {
       try {
         setLoading(true)
         const response = await api.get('/api/v1/merchant/salon/booking-settings')
-        setSettings((prev) => ({
-          ...prev,
-          ...response.data,
-        }))
+        const result = response.data?.data?.data || response.data?.data || response.data
+        if (result) {
+          setSettings((prev) => ({
+            bufferMinutes: result.bufferMinutes ?? prev.bufferMinutes,
+            minAdvanceMinutes: result.minAdvanceMinutes ?? prev.minAdvanceMinutes,
+            allowMultiService: result.allowMultiService ?? prev.allowMultiService,
+            allowMultiPerson: result.allowMultiPerson ?? prev.allowMultiPerson,
+            smsVerification: result.smsVerification ?? prev.smsVerification,
+            assignmentStrategy: result.assignmentStrategy ?? prev.assignmentStrategy,
+            allowGenderFilter: result.allowGenderFilter ?? prev.allowGenderFilter,
+          }))
+        }
       } catch (err) {
         if (err instanceof Error) {
           setError(err.message)
@@ -55,11 +58,17 @@ export const BookingSettingsPage: React.FC = () => {
     fetchSettings()
   }, [])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, type, checked, value } = e.target
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, type } = e.target
+    const value =
+      type === 'checkbox'
+        ? (e.target as HTMLInputElement).checked
+        : isNaN(Number(e.target.value))
+          ? e.target.value
+          : Number(e.target.value)
     setSettings((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : isNaN(Number(value)) ? value : Number(value),
+      [name]: value,
     }))
   }
 
@@ -70,7 +79,17 @@ export const BookingSettingsPage: React.FC = () => {
     setSaving(true)
 
     try {
-      await api.put('/api/v1/merchant/salon/booking-settings', settings)
+      // Only send DTO-accepted fields
+      const updateData: BookingSettings = {
+        bufferMinutes: settings.bufferMinutes,
+        minAdvanceMinutes: settings.minAdvanceMinutes,
+        allowMultiService: settings.allowMultiService,
+        allowMultiPerson: settings.allowMultiPerson,
+        smsVerification: settings.smsVerification,
+        assignmentStrategy: settings.assignmentStrategy,
+        allowGenderFilter: settings.allowGenderFilter,
+      }
+      await api.put('/api/v1/merchant/salon/booking-settings', updateData)
       setSuccess('Booking settings updated successfully!')
       setTimeout(() => setSuccess(''), 5000)
     } catch (err) {
@@ -111,175 +130,136 @@ export const BookingSettingsPage: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Advance Booking Settings */}
+            {/* Buffer & Advance Settings */}
             <div className="border-b border-gray-200 pb-8">
-              <h3 className="text-lg font-bold text-gray-800 mb-6">Advance Booking Settings</h3>
+              <h3 className="text-lg font-bold text-gray-800 mb-6">Scheduling Settings</h3>
 
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="minAdvanceBookingDays" className="block text-gray-700 font-semibold mb-2">
-                    Minimum Advance Booking (days)
+                  <label htmlFor="bufferMinutes" className="block text-gray-700 font-semibold mb-2">
+                    Buffer Time Between Bookings (minutes)
                   </label>
                   <input
-                    id="minAdvanceBookingDays"
+                    id="bufferMinutes"
                     type="number"
-                    name="minAdvanceBookingDays"
-                    value={settings.minAdvanceBookingDays || 0}
+                    name="bufferMinutes"
+                    value={settings.bufferMinutes || 0}
                     onChange={handleChange}
                     min="0"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <p className="text-sm text-gray-500 mt-1">
-                    Customers must book at least this many days in advance
+                    Minimum time required between consecutive bookings
                   </p>
                 </div>
 
                 <div>
-                  <label htmlFor="maxAdvanceBookingDays" className="block text-gray-700 font-semibold mb-2">
-                    Maximum Advance Booking (days)
+                  <label htmlFor="minAdvanceMinutes" className="block text-gray-700 font-semibold mb-2">
+                    Minimum Advance Booking (minutes)
                   </label>
                   <input
-                    id="maxAdvanceBookingDays"
+                    id="minAdvanceMinutes"
                     type="number"
-                    name="maxAdvanceBookingDays"
-                    value={settings.maxAdvanceBookingDays || 30}
+                    name="minAdvanceMinutes"
+                    value={settings.minAdvanceMinutes || 60}
                     onChange={handleChange}
                     min="0"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <p className="text-sm text-gray-500 mt-1">
-                    Customers cannot book more than this many days in advance
+                    Customers must book at least this many minutes in advance
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Cancellation & Reschedule Settings */}
+            {/* Service Options */}
             <div className="border-b border-gray-200 pb-8">
-              <h3 className="text-lg font-bold text-gray-800 mb-6">Cancellation & Reschedule Settings</h3>
+              <h3 className="text-lg font-bold text-gray-800 mb-6">Service Options</h3>
 
               <div className="space-y-4">
-                <div>
-                  <label htmlFor="minCancellationHours" className="block text-gray-700 font-semibold mb-2">
-                    Minimum Cancellation Notice (hours)
-                  </label>
+                <div className="flex items-center gap-3">
                   <input
-                    id="minCancellationHours"
-                    type="number"
-                    name="minCancellationHours"
-                    value={settings.minCancellationHours || 24}
-                    onChange={handleChange}
-                    min="0"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Customers must cancel at least this many hours before the appointment
-                  </p>
-                </div>
-
-                <div>
-                  <label htmlFor="minRescheduleHours" className="block text-gray-700 font-semibold mb-2">
-                    Minimum Reschedule Notice (hours)
-                  </label>
-                  <input
-                    id="minRescheduleHours"
-                    type="number"
-                    name="minRescheduleHours"
-                    value={settings.minRescheduleHours || 24}
-                    onChange={handleChange}
-                    min="0"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Customers must reschedule at least this many hours before the appointment
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3 pt-2">
-                  <input
-                    id="allowOnlineCancellation"
+                    id="allowMultiService"
                     type="checkbox"
-                    name="allowOnlineCancellation"
-                    checked={settings.allowOnlineCancellation || false}
+                    name="allowMultiService"
+                    checked={settings.allowMultiService || false}
                     onChange={handleChange}
                     className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                   />
-                  <label htmlFor="allowOnlineCancellation" className="text-gray-700 font-semibold">
-                    Allow Online Cancellation
+                  <label htmlFor="allowMultiService" className="text-gray-700 font-semibold">
+                    Allow Multiple Services per Booking
                   </label>
                 </div>
 
                 <div className="flex items-center gap-3">
                   <input
-                    id="allowOnlineReschedule"
+                    id="allowMultiPerson"
                     type="checkbox"
-                    name="allowOnlineReschedule"
-                    checked={settings.allowOnlineReschedule || false}
+                    name="allowMultiPerson"
+                    checked={settings.allowMultiPerson || false}
                     onChange={handleChange}
                     className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                   />
-                  <label htmlFor="allowOnlineReschedule" className="text-gray-700 font-semibold">
-                    Allow Online Reschedule
+                  <label htmlFor="allowMultiPerson" className="text-gray-700 font-semibold">
+                    Allow Multiple People per Booking
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <input
+                    id="allowGenderFilter"
+                    type="checkbox"
+                    name="allowGenderFilter"
+                    checked={settings.allowGenderFilter || false}
+                    onChange={handleChange}
+                    className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <label htmlFor="allowGenderFilter" className="text-gray-700 font-semibold">
+                    Allow Gender Filter for Staff
                   </label>
                 </div>
               </div>
             </div>
 
-            {/* Verification & Confirmation Settings */}
+            {/* Verification & Assignment */}
             <div className="border-b border-gray-200 pb-8">
-              <h3 className="text-lg font-bold text-gray-800 mb-6">Verification & Confirmation</h3>
+              <h3 className="text-lg font-bold text-gray-800 mb-6">Verification & Assignment</h3>
 
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <input
-                    id="requirePhoneVerification"
+                    id="smsVerification"
                     type="checkbox"
-                    name="requirePhoneVerification"
-                    checked={settings.requirePhoneVerification || false}
+                    name="smsVerification"
+                    checked={settings.smsVerification || false}
                     onChange={handleChange}
                     className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                   />
-                  <label htmlFor="requirePhoneVerification" className="text-gray-700 font-semibold">
-                    Require Phone Verification
+                  <label htmlFor="smsVerification" className="text-gray-700 font-semibold">
+                    Require SMS Verification
                   </label>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <input
-                    id="enableAutoConfirmation"
-                    type="checkbox"
-                    name="enableAutoConfirmation"
-                    checked={settings.enableAutoConfirmation || false}
+                <div>
+                  <label htmlFor="assignmentStrategy" className="block text-gray-700 font-semibold mb-2">
+                    Staff Assignment Strategy
+                  </label>
+                  <select
+                    id="assignmentStrategy"
+                    name="assignmentStrategy"
+                    value={settings.assignmentStrategy || 'COUNT'}
                     onChange={handleChange}
-                    className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                  />
-                  <label htmlFor="enableAutoConfirmation" className="text-gray-700 font-semibold">
-                    Enable Auto Confirmation
-                  </label>
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="COUNT">By Booking Count (even distribution)</option>
+                    <option value="RANDOM">Random</option>
+                    <option value="MANUAL">Manual Only</option>
+                  </select>
+                  <p className="text-sm text-gray-500 mt-1">
+                    How staff are automatically assigned to bookings
+                  </p>
                 </div>
-              </div>
-            </div>
-
-            {/* Buffer Time Settings */}
-            <div className="pb-8">
-              <h3 className="text-lg font-bold text-gray-800 mb-6">Buffer Time</h3>
-
-              <div>
-                <label htmlFor="bufferTimeBetweenBookings" className="block text-gray-700 font-semibold mb-2">
-                  Buffer Time Between Bookings (minutes)
-                </label>
-                <input
-                  id="bufferTimeBetweenBookings"
-                  type="number"
-                  name="bufferTimeBetweenBookings"
-                  value={settings.bufferTimeBetweenBookings || 0}
-                  onChange={handleChange}
-                  min="0"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  Minimum time required between consecutive bookings
-                </p>
               </div>
             </div>
 
