@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import api, { SALON_SUBDOMAIN } from '../lib/api'
+import api, { SALON_SUBDOMAIN, unwrap } from '../lib/api'
 import type { Salon, ServiceCategory, Staff } from '../lib/types'
 import { Header } from '../components/Header'
 import { Footer } from '../components/Footer'
@@ -19,9 +19,9 @@ export function HomePage() {
           api.get(`/api/v1/public/salon/${SALON_SUBDOMAIN}/services`),
           api.get(`/api/v1/public/salon/${SALON_SUBDOMAIN}/staff`),
         ])
-        setSalon(salonRes.data?.data || salonRes.data)
-        setCategories(servicesRes.data?.data || servicesRes.data)
-        setStaff(staffRes.data?.data || staffRes.data)
+        setSalon(unwrap(salonRes))
+        setCategories(unwrap(servicesRes))
+        setStaff(unwrap(staffRes))
       } catch (err) {
         console.error('Failed to load salon data:', err)
       } finally {

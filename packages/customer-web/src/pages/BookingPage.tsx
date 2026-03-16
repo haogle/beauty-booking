@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
-import api, { SALON_SUBDOMAIN } from '../lib/api'
+import api, { SALON_SUBDOMAIN, unwrap } from '../lib/api'
 import type { Salon, ServiceCategory, Staff, Service, TimeSlot, ServiceAddon } from '../lib/types'
 
 type BookingStep = 'service' | 'staff' | 'datetime' | 'confirm'
@@ -44,10 +44,10 @@ export function BookingPage() {
           api.get(`/api/v1/public/salon/${SALON_SUBDOMAIN}/services`),
           api.get(`/api/v1/public/salon/${SALON_SUBDOMAIN}/staff`),
         ])
-        setSalon(salonRes.data?.data || salonRes.data)
-        const cats = servicesRes.data?.data || servicesRes.data
+        setSalon(unwrap(salonRes))
+        const cats = unwrap(servicesRes)
         setCategories(cats)
-        setAllStaff(staffRes.data?.data || staffRes.data)
+        setAllStaff(unwrap(staffRes))
 
         // Pre-select service if serviceId in URL
         const preSelectedId = searchParams.get('serviceId')
@@ -97,7 +97,7 @@ export function BookingPage() {
         }
 
         const res = await api.get(`/api/v1/public/salon/${SALON_SUBDOMAIN}/availability`, { params })
-        const data = res.data?.data || res.data
+        const data = unwrap(res)
         setSlots(data.slots || [])
         setSlotsMessage(data.message || '')
       } catch (err) {
@@ -167,7 +167,7 @@ export function BookingPage() {
         addons: selectedAddons.length > 0 ? selectedAddons : undefined,
       })
 
-      const result = res.data?.data || res.data
+      const result = unwrap(res)
       navigate('/confirmation', { state: { booking: result, salonName: salon?.name } })
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Booking failed'
