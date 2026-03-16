@@ -54,7 +54,7 @@ export const CalendarPage: React.FC = () => {
         `/api/v1/merchant/salon/appointments?startDate=${mondayStr}&endDate=${sundayStr}&limit=1000`
       )
       const result = response.data?.data || response.data
-      setAppointments(result.appointments || [])
+      setAppointments(result.appointments || (Array.isArray(result) ? result : []))
       setError('')
     } catch (err) {
       if (err instanceof Error) {
@@ -206,8 +206,7 @@ export const CalendarPage: React.FC = () => {
                       className="flex-1 border-r border-gray-200 relative min-w-56 bg-white hover:bg-gray-50"
                     >
                       {/* Render appointments at their correct positions */}
-                      {idx === 0 &&
-                        getAppointmentsForDay(date).map((apt) => {
+                      {getAppointmentsForDay(date).map((apt) => {
                           const apptStartIdx = getTimeSlotPosition(apt.startTime)
                           // Only render the appointment once at its starting time slot
                           if (apptStartIdx === idx) {

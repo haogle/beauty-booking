@@ -64,9 +64,8 @@ export const AppointmentsPage: React.FC = () => {
         `/api/v1/merchant/salon/appointments?${params.toString()}`
       )
       const result = response.data?.data || response.data
-      const data = result as AppointmentsResponse
-      setAppointments(data.appointments || [])
-      setTotalPages(data.totalPages || 1)
+      setAppointments(result.appointments || (Array.isArray(result) ? result : []))
+      setTotalPages(result.totalPages || 1)
       setError('')
     } catch (err) {
       if (err instanceof Error) {
@@ -83,7 +82,7 @@ export const AppointmentsPage: React.FC = () => {
     try {
       const response = await api.get('/api/v1/merchant/salon/staff')
       const result = response.data?.data || response.data
-      setStaff(result.staff || [])
+      setStaff(Array.isArray(result) ? result : (result.staff || []))
     } catch (err) {
       console.error('Failed to load staff', err)
     }

@@ -1076,54 +1076,99 @@ export class SalonService {
    */
   async getAppointments(
     salonId: string,
-    filters: { date?: string; status?: string; staffId?: string; page?: number; limit?: number },
+    filters: { date?: string; startDate?: string; endDate?: string; status?: string; staffId?: string; page?: number; limit?: number },
   ) {
     // Verify salon exists
     await this.getSalon(salonId);
 
-    let sql = 'SELECT * FROM appointments WHERE salon_id = ?';
-    const params: any[] = [salonId];
+    let whereSql = 'WHERE salon_id = ?';
+    const whereParams: any[] = [salonId];
 
     if (filters.date) {
-      sql += ' AND date = ?';
-      params.push(filters.date);
+      whereSql += ' AND date = ?';
+      whereParams.push(filters.date);
+    }
+    if (filters.startDate) {
+      whereSql += ' AND date >= ?';
+      whereParams.push(filters.startDate);
+    }
+    if (filters.endDate) {
+      whereSql += ' AND date <= ?';
+      whereParams.push(filters.endDate);
     }
     if (filters.status) {
-      sql += ' AND status = ?';
-      params.push(filters.status);
+      whereSql += ' AND status = ?';
+      whereParams.push(filters.status);
     }
     if (filters.staffId) {
-      sql += ' AND id IN (SELECT appointment_id FROM appointment_services WHERE staff_id = ?)';
-      params.push(filters.staffId);
+      whereSql += ' AND id IN (SELECT appointment_id FROM appointment_services WHERE staff_id = ?)';
+      whereParams.push(filters.staffId);
     }
 
-    sql += ' ORDER BY date DESC, start_time DESC';
+    // Get total count
+    const countRow = await this.db.get(`SELECT COUNT(*) as count FROM appointments ${whereSql}`, whereParams);
+    const total = parseInt(String(countRow?.count || 0), 10);
 
     // Add pagination (query params may arrive as strings)
     const page = parseInt(String(filters.page), 10) || 1;
     const limit = parseInt(String(filters.limit), 10) || 50;
     const offset = (page - 1) * limit;
+    const totalPages = Math.ceil(total / limit);
 
-    sql += ' LIMIT ? OFFSET ?';
-    params.push(limit, offset);
+    let sql = `SELECT * FROM appointments ${whereSql} ORDER BY date DESC, start_time DESC LIMIT ? OFFSET ?`;
+    const params = [...whereParams, limit, offset];
 
     const appointments = await this.db.all(sql, params);
 
-    // Get services for each appointment
+    // Get services, client info, staff info for each appointment
     const result = [];
     for (const apt of appointments) {
-      const services = await this.db.all(
+      const aptServices = await this.db.all(
         'SELECT * FROM appointment_services WHERE appointment_id = ?',
         [apt.id],
       );
 
+      // Get client name
+      let clientName = 'Unknown';
+      if (apt.client_id) {
+        const client = await this.db.get('SELECT first_name, last_name FROM clients WHERE id = ?', [apt.client_id]);
+        if (client) clientName = `${client.first_name} ${client.last_name}`.trim();
+      }
+
+      // Get primary service name and staff name from first appointment_service
+      let serviceName = 'Unknown';
+      let staffName = 'Unknown';
+      let duration = apt.total_duration || 0;
+      if (aptServices.length > 0) {
+        const firstSvc = aptServices[0];
+        if (firstSvc.service_id) {
+          const svc = await this.db.get('SELECT name FROM services WHERE id = ?', [firstSvc.service_id]);
+          if (svc) serviceName = svc.name;
+        }
+        if (firstSvc.staff_id) {
+          const staff = await this.db.get('SELECT first_name, last_name FROM staff WHERE id = ?', [firstSvc.staff_id]);
+          if (staff) staffName = `${staff.first_name} ${staff.last_name}`.trim();
+        }
+      }
+
       result.push({
         ...this.normalizeAppointment(apt),
-        services: services.map(s => this.normalizeAppointmentService(s)),
+        clientName,
+        serviceName,
+        staffName,
+        duration,
+        time: apt.start_time,
+        services: aptServices.map(s => this.normalizeAppointmentService(s)),
       });
     }
 
-    return result;
+    return {
+      appointments: result,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   /**

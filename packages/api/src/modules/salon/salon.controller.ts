@@ -351,6 +351,8 @@ export class SalonController {
   async getAppointments(
     @CurrentUserDecorator() user: CurrentUser,
     @Query('date') date?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Query('status') status?: string,
     @Query('staffId') staffId?: string,
     @Query('page') page?: number,
@@ -358,6 +360,8 @@ export class SalonController {
   ) {
     return this.salonService.getAppointments(user.salonId, {
       date,
+      startDate,
+      endDate,
       status,
       staffId,
       page,

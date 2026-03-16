@@ -69,8 +69,7 @@ export const ServicesPage: React.FC = () => {
       setLoading(true)
       const response = await api.get('/api/v1/merchant/salon/services')
       const result = response.data?.data || response.data
-      const data = result as CategoriesData
-      setCategories(data.categories || [])
+      setCategories(Array.isArray(result) ? result : (result?.categories || []))
       setError('')
     } catch (err) {
       if (err instanceof Error) {

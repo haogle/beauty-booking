@@ -70,8 +70,7 @@ export const StaffPage: React.FC = () => {
       setLoading(true)
       const response = await api.get('/api/v1/merchant/salon/staff')
       const result = response.data?.data || response.data
-      const data = result as StaffResponse
-      setStaff(data.staff || [])
+      setStaff(Array.isArray(result) ? result : (result.staff || []))
       setError('')
     } catch (err) {
       if (err instanceof Error) {
@@ -88,7 +87,8 @@ export const StaffPage: React.FC = () => {
     try {
       const response = await api.get('/api/v1/merchant/salon/services')
       const result = response.data?.data || response.data
-      const services = result.categories?.flatMap((cat: any) => cat.services || []) || []
+      const categories = Array.isArray(result) ? result : (result.categories || [])
+      const services = categories.flatMap((cat: any) => cat.services || [])
       setAllServices(services)
     } catch (err) {
       console.error('Failed to load services', err)
