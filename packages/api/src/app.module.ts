@@ -1,12 +1,11 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER } from '@nestjs/core';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PlatformModule } from './platform/platform.module';
 import { SalonModule } from './modules/salon/salon.module';
 import { PublicModule } from './modules/public/public.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { AppController } from './app.controller';
 
@@ -17,10 +16,6 @@ import { AppController } from './app.controller';
     {
       provide: APP_FILTER,
       useClass: HttpExceptionFilter,
-    },
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: TransformInterceptor,
     },
   ],
 })
