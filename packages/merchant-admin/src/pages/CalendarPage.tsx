@@ -110,11 +110,12 @@ export const CalendarPage: React.FC = () => {
   }
 
   const getAppointmentStyle = (apt: Appointment) => {
-    const startIdx = getTimeSlotPosition(apt.startTime)
-    const heightMultiplier = apt.duration / 30
+    // Appointment is rendered inside its matching time slot cell, so top is 0
+    const heightMultiplier = (apt.duration || 30) / 30
     return {
-      top: `${startIdx * 60 + 40}px`,
-      height: `${heightMultiplier * 60 - 2}px`,
+      top: '0px',
+      height: `${heightMultiplier * 64 - 2}px`,
+      zIndex: 10,
     }
   }
 
