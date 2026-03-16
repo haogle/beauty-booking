@@ -252,7 +252,9 @@ export const StaffPage: React.FC = () => {
   }
 
   const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+    const f = firstName || ''
+    const l = lastName || ''
+    return `${f.charAt(0) || '?'}${l.charAt(0) || '?'}`.toUpperCase()
   }
 
   if (loading) {

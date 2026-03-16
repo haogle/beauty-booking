@@ -858,16 +858,16 @@ export class SalonService {
 
     const id = this.db.generateId();
     const now = new Date().toISOString();
+    const fullName = `${data.firstName || ''} ${data.lastName || ''}`.trim();
     const sql = `
       INSERT INTO staff
-      (id, salon_id, first_name, last_name, email, phone, role, bio, avatar_url, is_active, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+      (id, salon_id, name, email, phone, role, bio, avatar_url, is_active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
     `;
     await this.db.run(sql, [
       id,
       salonId,
-      data.firstName,
-      data.lastName,
+      fullName,
       data.email || null,
       data.phone || null,
       data.role,
@@ -898,13 +898,14 @@ export class SalonService {
     const updates: string[] = [];
     const params: any[] = [];
 
-    if (data.firstName !== undefined) {
-      updates.push('first_name = ?');
-      params.push(data.firstName);
-    }
-    if (data.lastName !== undefined) {
-      updates.push('last_name = ?');
-      params.push(data.lastName);
+    if (data.firstName !== undefined || data.lastName !== undefined) {
+      // Staff table uses single 'name' column - combine first + last
+      const currentName = staff.name || '';
+      const currentParts = currentName.split(' ');
+      const newFirst = data.firstName !== undefined ? data.firstName : (currentParts[0] || '');
+      const newLast = data.lastName !== undefined ? data.lastName : (currentParts.slice(1).join(' ') || '');
+      updates.push('name = ?');
+      params.push(`${newFirst} ${newLast}`.trim());
     }
     if (data.email !== undefined) {
       updates.push('email = ?');
@@ -1146,8 +1147,8 @@ export class SalonService {
           if (svc) serviceName = svc.name;
         }
         if (firstSvc.staff_id) {
-          const staff = await this.db.get('SELECT first_name, last_name FROM staff WHERE id = ?', [firstSvc.staff_id]);
-          if (staff) staffName = `${staff.first_name} ${staff.last_name}`.trim();
+          const staff = await this.db.get('SELECT name FROM staff WHERE id = ?', [firstSvc.staff_id]);
+          if (staff) staffName = staff.name || 'Unknown';
         }
       }
 
@@ -1413,11 +1414,16 @@ export class SalonService {
    */
   private normalizeStaff(row: any): any {
     if (!row) return row;
+    // Staff table uses a single 'name' column, split into firstName/lastName for frontend
+    const nameParts = (row.name || '').split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
     return {
       id: row.id,
       salonId: row.salon_id,
-      firstName: row.first_name,
-      lastName: row.last_name,
+      name: row.name,
+      firstName,
+      lastName,
       email: row.email,
       phone: row.phone,
       role: row.role,
