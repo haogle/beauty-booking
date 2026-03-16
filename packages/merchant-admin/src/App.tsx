@@ -11,6 +11,7 @@ import { StaffPage } from './pages/StaffPage'
 import { AppointmentsPage } from './pages/AppointmentsPage'
 import { CalendarPage } from './pages/CalendarPage'
 import { CustomersPage } from './pages/CustomersPage'
+import { GiftCardsPage } from './pages/GiftCardsPage'
 
 function App() {
   return (
@@ -55,6 +56,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <CustomersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/gift-cards"
+            element={
+              <ProtectedRoute>
+                <GiftCardsPage />
               </ProtectedRoute>
             }
           />

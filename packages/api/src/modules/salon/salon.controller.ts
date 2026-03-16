@@ -465,6 +465,84 @@ export class SalonController {
     return this.salonService.getClientAppointments(clientId, user.salonId);
   }
 
+  // ============ GIFT CARDS ============
+
+  @Get('/gift-card-categories')
+  async getGiftCardCategories(@CurrentUserDecorator() user: CurrentUser) {
+    return this.salonService.getGiftCardCategories(user.salonId);
+  }
+
+  @Post('/gift-card-categories')
+  @Roles('OWNER')
+  async createGiftCardCategory(@CurrentUserDecorator() user: CurrentUser, @Body() data: any) {
+    return this.salonService.createGiftCardCategory(user.salonId, data);
+  }
+
+  @Put('/gift-card-categories/:id')
+  @Roles('OWNER')
+  async updateGiftCardCategory(@CurrentUserDecorator() user: CurrentUser, @Param('id') id: string, @Body() data: any) {
+    return this.salonService.updateGiftCardCategory(id, user.salonId, data);
+  }
+
+  @Delete('/gift-card-categories/:id')
+  @Roles('OWNER')
+  async deleteGiftCardCategory(@CurrentUserDecorator() user: CurrentUser, @Param('id') id: string) {
+    return this.salonService.deleteGiftCardCategory(id, user.salonId);
+  }
+
+  @Get('/gift-card-products')
+  async getGiftCardProducts(@CurrentUserDecorator() user: CurrentUser) {
+    return this.salonService.getGiftCardProducts(user.salonId);
+  }
+
+  @Get('/gift-card-products/:id')
+  async getGiftCardProduct(@CurrentUserDecorator() user: CurrentUser, @Param('id') id: string) {
+    return this.salonService.getGiftCardProductById(id, user.salonId);
+  }
+
+  @Post('/gift-card-products')
+  @Roles('OWNER')
+  async createGiftCardProduct(@CurrentUserDecorator() user: CurrentUser, @Body() data: any) {
+    return this.salonService.createGiftCardProduct(user.salonId, data);
+  }
+
+  @Put('/gift-card-products/:id')
+  @Roles('OWNER')
+  async updateGiftCardProduct(@CurrentUserDecorator() user: CurrentUser, @Param('id') id: string, @Body() data: any) {
+    return this.salonService.updateGiftCardProduct(id, user.salonId, data);
+  }
+
+  @Delete('/gift-card-products/:id')
+  @Roles('OWNER')
+  async deleteGiftCardProduct(@CurrentUserDecorator() user: CurrentUser, @Param('id') id: string) {
+    return this.salonService.deleteGiftCardProduct(id, user.salonId);
+  }
+
+  @Post('/gift-cards/issue')
+  async issueGiftCard(@CurrentUserDecorator() user: CurrentUser, @Body() data: any) {
+    return this.salonService.issueGiftCard(user.salonId, data);
+  }
+
+  @Get('/gift-cards/issued')
+  async getIssuedGiftCards(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Query('search') search?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.salonService.getIssuedGiftCards(user.salonId, { search, page, limit });
+  }
+
+  @Get('/gift-cards/:serialNo')
+  async getGiftCardInstance(@CurrentUserDecorator() user: CurrentUser, @Param('serialNo') serialNo: string) {
+    return this.salonService.getGiftCardInstance(serialNo, user.salonId);
+  }
+
+  @Post('/gift-cards/redeem')
+  async redeemGiftCard(@CurrentUserDecorator() user: CurrentUser, @Body() data: any) {
+    return this.salonService.redeemGiftCard(user.salonId, data);
+  }
+
   // ============ DASHBOARD STATS ============
 
   /**

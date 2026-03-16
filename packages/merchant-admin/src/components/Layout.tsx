@@ -20,6 +20,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/appointments', label: 'Appointments' },
     { path: '/calendar', label: 'Calendar' },
     { path: '/customers', label: 'Customers' },
+    { path: '/gift-cards', label: 'Gift Cards' },
     { path: '/services', label: 'Services' },
     { path: '/staff', label: 'Staff' },
     // Settings section

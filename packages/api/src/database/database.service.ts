@@ -421,6 +421,50 @@ export class DatabaseService implements OnModuleInit {
     await this.exec(`CREATE INDEX IF NOT EXISTS idx_gift_card_usage_logs_instance_id ON gift_card_usage_logs(instance_id)`);
     await this.exec(`CREATE INDEX IF NOT EXISTS idx_gift_card_usage_logs_salon_id ON gift_card_usage_logs(salon_id)`);
 
+    // Gift card categories table
+    await this.exec(`
+      CREATE TABLE IF NOT EXISTS gift_card_categories (
+        id TEXT PRIMARY KEY,
+        salon_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+      )
+    `);
+
+    await this.exec(`CREATE INDEX IF NOT EXISTS idx_gift_card_categories_salon_id ON gift_card_categories(salon_id)`);
+
+    // Extend gift_card_products with category, font_color, is_listed
+    try { await this.exec(`ALTER TABLE gift_card_products ADD COLUMN IF NOT EXISTS category_id TEXT`); } catch {}
+    try { await this.exec(`ALTER TABLE gift_card_products ADD COLUMN IF NOT EXISTS font_color TEXT DEFAULT '#FFFFFF'`); } catch {}
+    try { await this.exec(`ALTER TABLE gift_card_products ADD COLUMN IF NOT EXISTS is_listed INTEGER NOT NULL DEFAULT 0`); } catch {}
+
+    // Gift card product items (for item-type cards linking to services)
+    await this.exec(`
+      CREATE TABLE IF NOT EXISTS gift_card_product_items (
+        id TEXT PRIMARY KEY,
+        product_id TEXT NOT NULL,
+        salon_id TEXT NOT NULL,
+        service_id TEXT NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        FOREIGN KEY (product_id) REFERENCES gift_card_products(id) ON DELETE CASCADE,
+        FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE,
+        FOREIGN KEY (salon_id) REFERENCES salons(id) ON DELETE CASCADE
+      )
+    `);
+
+    await this.exec(`CREATE INDEX IF NOT EXISTS idx_gift_card_product_items_product_id ON gift_card_product_items(product_id)`);
+
+    // Extend gift_card_instances with buyer_client_id and remaining_items for item cards
+    try { await this.exec(`ALTER TABLE gift_card_instances ADD COLUMN IF NOT EXISTS buyer_client_id TEXT`); } catch {}
+    try { await this.exec(`ALTER TABLE gift_card_instances ADD COLUMN IF NOT EXISTS remaining_items TEXT DEFAULT '[]'`); } catch {}
+
+    // Extend gift_card_usage_logs with service tracking for item redemptions
+    try { await this.exec(`ALTER TABLE gift_card_usage_logs ADD COLUMN IF NOT EXISTS service_id TEXT`); } catch {}
+    try { await this.exec(`ALTER TABLE gift_card_usage_logs ADD COLUMN IF NOT EXISTS item_quantity INTEGER`); } catch {}
+    try { await this.exec(`ALTER TABLE gift_card_usage_logs ADD COLUMN IF NOT EXISTS redemption_type TEXT DEFAULT 'AMOUNT'`); } catch {}
+
     // WebsiteConfig table
     await this.exec(`
       CREATE TABLE IF NOT EXISTS website_configs (
