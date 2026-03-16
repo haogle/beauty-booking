@@ -63,6 +63,16 @@ interface StaffWorkHourInput {
   isOff: boolean;
 }
 
+interface ClientInput {
+  firstName: string;
+  lastName?: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+  tags?: string[];
+  source?: string;
+}
+
 @Injectable()
 export class SalonService {
   constructor(private db: DatabaseService) {}
@@ -1224,6 +1234,225 @@ export class SalonService {
 
     const row = await this.db.get('SELECT * FROM appointments WHERE id = ?', [id]);
     return this.normalizeAppointment(row);
+  }
+
+  // ============ CLIENT/CUSTOMER MANAGEMENT ============
+
+  /**
+   * Get all clients with pagination and search
+   */
+  async getClients(
+    salonId: string,
+    filters: { search?: string; page?: number; limit?: number },
+  ) {
+    await this.getSalon(salonId);
+
+    let whereSql = 'WHERE salon_id = ?';
+    const whereParams: any[] = [salonId];
+
+    if (filters.search) {
+      whereSql += ` AND (first_name LIKE ? OR last_name LIKE ? OR phone LIKE ? OR email LIKE ?)`;
+      const searchTerm = `%${filters.search}%`;
+      whereParams.push(searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    // Get total count
+    const countRow = await this.db.get(`SELECT COUNT(*) as count FROM clients ${whereSql}`, whereParams);
+    const total = parseInt(String(countRow?.count || 0), 10);
+
+    const page = parseInt(String(filters.page), 10) || 1;
+    const limit = parseInt(String(filters.limit), 10) || 50;
+    const offset = (page - 1) * limit;
+    const totalPages = Math.ceil(total / limit);
+
+    const sql = `SELECT * FROM clients ${whereSql} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+    const params = [...whereParams, limit, offset];
+
+    const clients = await this.db.all(sql, params);
+
+    return {
+      clients: clients.map(c => this.normalizeClient(c)),
+      total,
+      page,
+      limit,
+      totalPages,
+    };
+  }
+
+  /**
+   * Get a single client by ID
+   */
+  async getClient(id: string, salonId: string) {
+    const client = await this.db.get(
+      'SELECT * FROM clients WHERE id = ? AND salon_id = ?',
+      [id, salonId],
+    );
+
+    if (!client) {
+      throw new NotFoundException(`Client with ID ${id} not found`);
+    }
+
+    return this.normalizeClient(client);
+  }
+
+  /**
+   * Create a new client
+   */
+  async createClient(salonId: string, data: ClientInput) {
+    await this.getSalon(salonId);
+
+    if (!data.firstName) {
+      throw new BadRequestException('firstName is required');
+    }
+
+    const id = this.db.generateId();
+    const now = new Date().toISOString();
+    const sql = `
+      INSERT INTO clients
+      (id, salon_id, first_name, last_name, phone, email, notes, tags, source, total_visits, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+    `;
+    await this.db.run(sql, [
+      id,
+      salonId,
+      data.firstName,
+      data.lastName || '',
+      data.phone || null,
+      data.email || null,
+      data.notes || null,
+      data.tags ? JSON.stringify(data.tags) : '[]',
+      data.source || 'MANUAL',
+      now,
+      now,
+    ]);
+
+    const row = await this.db.get('SELECT * FROM clients WHERE id = ?', [id]);
+    return this.normalizeClient(row);
+  }
+
+  /**
+   * Update an existing client
+   */
+  async updateClient(id: string, salonId: string, data: Partial<ClientInput>) {
+    const client = await this.db.get('SELECT * FROM clients WHERE id = ?', [id]);
+
+    if (!client) {
+      throw new NotFoundException(`Client with ID ${id} not found`);
+    }
+
+    if (client.salon_id !== salonId) {
+      throw new BadRequestException('Client does not belong to this salon');
+    }
+
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (data.firstName !== undefined) {
+      updates.push('first_name = ?');
+      params.push(data.firstName);
+    }
+    if (data.lastName !== undefined) {
+      updates.push('last_name = ?');
+      params.push(data.lastName);
+    }
+    if (data.phone !== undefined) {
+      updates.push('phone = ?');
+      params.push(data.phone);
+    }
+    if (data.email !== undefined) {
+      updates.push('email = ?');
+      params.push(data.email);
+    }
+    if (data.notes !== undefined) {
+      updates.push('notes = ?');
+      params.push(data.notes);
+    }
+    if (data.tags !== undefined) {
+      updates.push('tags = ?');
+      params.push(JSON.stringify(data.tags));
+    }
+
+    if (updates.length === 0) {
+      return this.normalizeClient(client);
+    }
+
+    updates.push('updated_at = ?');
+    params.push(new Date().toISOString());
+    params.push(id);
+    const sql = `UPDATE clients SET ${updates.join(', ')} WHERE id = ?`;
+    await this.db.run(sql, params);
+
+    const row = await this.db.get('SELECT * FROM clients WHERE id = ?', [id]);
+    return this.normalizeClient(row);
+  }
+
+  /**
+   * Delete a client
+   */
+  async deleteClient(id: string, salonId: string) {
+    const client = await this.db.get('SELECT * FROM clients WHERE id = ?', [id]);
+
+    if (!client) {
+      throw new NotFoundException(`Client with ID ${id} not found`);
+    }
+
+    if (client.salon_id !== salonId) {
+      throw new BadRequestException('Client does not belong to this salon');
+    }
+
+    await this.db.run('DELETE FROM clients WHERE id = ?', [id]);
+    return this.normalizeClient(client);
+  }
+
+  /**
+   * Get appointment history for a client
+   */
+  async getClientAppointments(clientId: string, salonId: string) {
+    // Verify client belongs to salon
+    const client = await this.db.get(
+      'SELECT * FROM clients WHERE id = ? AND salon_id = ?',
+      [clientId, salonId],
+    );
+
+    if (!client) {
+      throw new NotFoundException(`Client with ID ${clientId} not found`);
+    }
+
+    const appointments = await this.db.all(
+      'SELECT * FROM appointments WHERE client_id = ? AND salon_id = ? ORDER BY date DESC, start_time DESC',
+      [clientId, salonId],
+    );
+
+    const result = [];
+    for (const apt of appointments) {
+      const aptServices = await this.db.all(
+        'SELECT * FROM appointment_services WHERE appointment_id = ?',
+        [apt.id],
+      );
+
+      let serviceName = 'Unknown';
+      let staffName = 'Unknown';
+      if (aptServices.length > 0) {
+        const firstSvc = aptServices[0];
+        if (firstSvc.service_id) {
+          const svc = await this.db.get('SELECT name FROM services WHERE id = ?', [firstSvc.service_id]);
+          if (svc) serviceName = svc.name;
+        }
+        if (firstSvc.staff_id) {
+          const staff = await this.db.get('SELECT name FROM staff WHERE id = ?', [firstSvc.staff_id]);
+          if (staff) staffName = staff.name || 'Unknown';
+        }
+      }
+
+      result.push({
+        ...this.normalizeAppointment(apt),
+        serviceName,
+        staffName,
+        duration: apt.total_duration || 0,
+      });
+    }
+
+    return result;
   }
 
   /**

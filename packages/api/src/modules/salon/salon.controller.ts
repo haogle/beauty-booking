@@ -393,6 +393,78 @@ export class SalonController {
     return this.salonService.updateAppointmentStatus(id, user.salonId, data.status);
   }
 
+  // ============ CLIENT/CUSTOMER MANAGEMENT ============
+
+  /**
+   * GET /clients - List clients with search and pagination
+   */
+  @Get('/clients')
+  async getClients(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Query('search') search?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.salonService.getClients(user.salonId, { search, page, limit });
+  }
+
+  /**
+   * GET /clients/:id - Get single client
+   */
+  @Get('/clients/:id')
+  async getClient(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.salonService.getClient(id, user.salonId);
+  }
+
+  /**
+   * POST /clients - Create a new client
+   */
+  @Post('/clients')
+  async createClient(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Body() data: any,
+  ) {
+    return this.salonService.createClient(user.salonId, data);
+  }
+
+  /**
+   * PUT /clients/:id - Update client
+   */
+  @Put('/clients/:id')
+  async updateClient(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Param('id') id: string,
+    @Body() data: any,
+  ) {
+    return this.salonService.updateClient(id, user.salonId, data);
+  }
+
+  /**
+   * DELETE /clients/:id - Delete client
+   */
+  @Delete('/clients/:id')
+  @Roles('OWNER')
+  async deleteClient(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.salonService.deleteClient(id, user.salonId);
+  }
+
+  /**
+   * GET /clients/:id/appointments - Get client appointment history
+   */
+  @Get('/clients/:id/appointments')
+  async getClientAppointments(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Param('id') clientId: string,
+  ) {
+    return this.salonService.getClientAppointments(clientId, user.salonId);
+  }
+
   // ============ DASHBOARD STATS ============
 
   /**
