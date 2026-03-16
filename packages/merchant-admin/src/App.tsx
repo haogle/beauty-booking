@@ -6,6 +6,10 @@ import { DashboardPage } from './pages/DashboardPage'
 import { SalonSettingsPage } from './pages/SalonSettingsPage'
 import { BusinessHoursPage } from './pages/BusinessHoursPage'
 import { BookingSettingsPage } from './pages/BookingSettingsPage'
+import { ServicesPage } from './pages/ServicesPage'
+import { StaffPage } from './pages/StaffPage'
+import { AppointmentsPage } from './pages/AppointmentsPage'
+import { CalendarPage } from './pages/CalendarPage'
 
 function App() {
   return (
@@ -18,6 +22,38 @@ function App() {
             element={
               <ProtectedRoute>
                 <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/appointments"
+            element={
+              <ProtectedRoute>
+                <AppointmentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/calendar"
+            element={
+              <ProtectedRoute>
+                <CalendarPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/services"
+            element={
+              <ProtectedRoute>
+                <ServicesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff"
+            element={
+              <ProtectedRoute>
+                <StaffPage />
               </ProtectedRoute>
             }
           />

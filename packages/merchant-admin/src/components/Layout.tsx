@@ -17,6 +17,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard' },
+    { path: '/appointments', label: 'Appointments' },
+    { path: '/calendar', label: 'Calendar' },
+    { path: '/services', label: 'Services' },
+    { path: '/staff', label: 'Staff' },
+    // Settings section
     { path: '/salon-settings', label: 'Salon Settings' },
     { path: '/business-hours', label: 'Business Hours' },
     { path: '/booking-settings', label: 'Booking Settings' },

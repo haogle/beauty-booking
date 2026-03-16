@@ -19,7 +19,8 @@ export const DashboardPage: React.FC = () => {
       try {
         setLoading(true)
         const response = await api.get('/api/v1/merchant/dashboard/stats')
-        setStats(response.data || {})
+        const result = response.data?.data || response.data
+        setStats(result || {})
       } catch (err) {
         if (err instanceof Error) {
           setError(err.message)
@@ -90,20 +91,28 @@ export const DashboardPage: React.FC = () => {
         <div className="bg-white rounded-lg shadow p-6 mt-8">
           <h2 className="text-xl font-bold text-gray-800 mb-4">Welcome to Your Dashboard</h2>
           <p className="text-gray-600 mb-4">
-            Use the sidebar navigation to manage your salon settings, business hours, and booking preferences.
+            Use the sidebar navigation to manage your services, staff, appointments, and salon settings.
           </p>
           <ul className="space-y-2 text-gray-600">
             <li className="flex items-center">
               <span className="text-blue-600 mr-2">→</span>
+              <span>Go to Services to manage service categories, services, and add-ons</span>
+            </li>
+            <li className="flex items-center">
+              <span className="text-blue-600 mr-2">→</span>
+              <span>Go to Staff to manage staff members, their services, and work hours</span>
+            </li>
+            <li className="flex items-center">
+              <span className="text-blue-600 mr-2">→</span>
+              <span>Go to Appointments to view and manage all client appointments</span>
+            </li>
+            <li className="flex items-center">
+              <span className="text-blue-600 mr-2">→</span>
+              <span>Go to Calendar to view appointments in a weekly calendar view</span>
+            </li>
+            <li className="flex items-center">
+              <span className="text-blue-600 mr-2">→</span>
               <span>Go to Salon Settings to update your salon information</span>
-            </li>
-            <li className="flex items-center">
-              <span className="text-blue-600 mr-2">→</span>
-              <span>Configure Business Hours to set your operating schedule</span>
-            </li>
-            <li className="flex items-center">
-              <span className="text-blue-600 mr-2">→</span>
-              <span>Manage Booking Settings to customize your booking experience</span>
             </li>
           </ul>
         </div>
