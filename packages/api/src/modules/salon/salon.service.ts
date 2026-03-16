@@ -1099,9 +1099,9 @@ export class SalonService {
 
     sql += ' ORDER BY date DESC, start_time DESC';
 
-    // Add pagination
-    const page = filters.page ?? 1;
-    const limit = filters.limit ?? 50;
+    // Add pagination (query params may arrive as strings)
+    const page = parseInt(String(filters.page), 10) || 1;
+    const limit = parseInt(String(filters.limit), 10) || 50;
     const offset = (page - 1) * limit;
 
     sql += ' LIMIT ? OFFSET ?';
