@@ -504,4 +504,40 @@ export class PublicService {
     const m = minutes % 60;
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
   }
+
+  /**
+   * Get website config for public rendering
+   */
+  async getWebsiteConfig(salonId: string) {
+    const row = await this.db.get<any>(
+      'SELECT * FROM website_configs WHERE salon_id = ?',
+      [salonId],
+    );
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      theme: this.parseJson(row.theme, {}),
+      navbar: this.parseJson(row.navbar, {}),
+      announcement: row.announcement || '',
+      hero: this.parseJson(row.hero, {}),
+      sections: this.parseJson(row.sections, []),
+      footer: this.parseJson(row.footer, {}),
+      servicePage: this.parseJson(row.service_page, {}),
+      seo: this.parseJson(row.seo, {}),
+      publishedAt: row.published_at,
+    };
+  }
+
+  private parseJson(value: any, defaultValue: any) {
+    if (!value) return defaultValue;
+    if (typeof value === 'object') return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return defaultValue;
+    }
+  }
 }

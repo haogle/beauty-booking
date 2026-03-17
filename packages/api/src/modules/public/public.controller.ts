@@ -62,6 +62,16 @@ export class PublicController {
   }
 
   /**
+   * Get website config (published)
+   * GET /api/v1/public/salon/:subdomain/website-config
+   */
+  @Get('salon/:subdomain/website-config')
+  async getWebsiteConfig(@Param('subdomain') subdomain: string) {
+    const salon = await this.publicService.getSalonBySubdomain(subdomain);
+    return this.publicService.getWebsiteConfig(salon.id);
+  }
+
+  /**
    * Create a booking
    * POST /api/v1/public/salon/:subdomain/book
    */
