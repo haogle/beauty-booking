@@ -765,6 +765,12 @@ export const CalendarPage: React.FC = () => {
             >
               + New Appointment
             </button>
+            <button
+              onClick={() => openTimeBlockModal()}
+              className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+            >
+              + Time Block
+            </button>
           </div>
         </div>
 
