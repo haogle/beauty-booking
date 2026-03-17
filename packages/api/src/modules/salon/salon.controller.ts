@@ -468,6 +468,89 @@ export class SalonController {
     return this.salonService.updateAppointmentTip(user.salonId, id, data.tip);
   }
 
+  /**
+   * POST /appointments - Create appointment manually from calendar
+   */
+  @Post('/appointments')
+  @Roles('OWNER', 'RECEPTIONIST')
+  async createAppointment(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Body() data: any,
+  ) {
+    return this.salonService.createAppointment(user.salonId, data);
+  }
+
+  /**
+   * PUT /appointments/:id - Update/modify appointment
+   */
+  @Put('/appointments/:id')
+  @Roles('OWNER', 'RECEPTIONIST')
+  async updateAppointment(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Param('id') id: string,
+    @Body() data: any,
+  ) {
+    return this.salonService.updateAppointment(id, user.salonId, data);
+  }
+
+  // ============ TIME BLOCKS ============
+
+  /**
+   * GET /time-blocks - List time blocks with optional filters
+   */
+  @Get('/time-blocks')
+  async getTimeBlocks(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Query('date') date?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('staffId') staffId?: string,
+  ) {
+    return this.salonService.getTimeBlocks(user.salonId, {
+      date,
+      startDate,
+      endDate,
+      staffId,
+    });
+  }
+
+  /**
+   * POST /time-blocks - Create time block
+   */
+  @Post('/time-blocks')
+  @Roles('OWNER', 'RECEPTIONIST')
+  async createTimeBlock(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Body() data: any,
+  ) {
+    return this.salonService.createTimeBlock(user.salonId, data);
+  }
+
+  /**
+   * PUT /time-blocks/:id - Update time block
+   */
+  @Put('/time-blocks/:id')
+  @Roles('OWNER', 'RECEPTIONIST')
+  async updateTimeBlock(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Param('id') id: string,
+    @Body() data: any,
+  ) {
+    return this.salonService.updateTimeBlock(id, user.salonId, data);
+  }
+
+  /**
+   * DELETE /time-blocks/:id - Delete time block
+   */
+  @Delete('/time-blocks/:id')
+  @Roles('OWNER', 'RECEPTIONIST')
+  async deleteTimeBlock(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.salonService.deleteTimeBlock(id, user.salonId);
+  }
+
   // ============ CLIENT/CUSTOMER MANAGEMENT ============
 
   /**

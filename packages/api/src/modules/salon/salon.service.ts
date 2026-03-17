@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import * as crypto from 'crypto';
 
 interface BusinessHourInput {
   dayOfWeek: number;
@@ -2218,6 +2219,412 @@ export class SalonService {
       page,
       limit,
       totalPages,
+    };
+  }
+
+  // ============ TIME BLOCKS ============
+
+  /**
+   * Get time blocks with optional filters (date, dateRange, staffId)
+   */
+  async getTimeBlocks(
+    salonId: string,
+    filters: { date?: string; startDate?: string; endDate?: string; staffId?: string },
+  ) {
+    let whereSql = 'WHERE salon_id = ?';
+    const whereParams: any[] = [salonId];
+
+    if (filters.date) {
+      whereSql += ' AND date = ?';
+      whereParams.push(filters.date);
+    }
+    if (filters.startDate) {
+      whereSql += ' AND date >= ?';
+      whereParams.push(filters.startDate);
+    }
+    if (filters.endDate) {
+      whereSql += ' AND date <= ?';
+      whereParams.push(filters.endDate);
+    }
+    if (filters.staffId) {
+      whereSql += ' AND staff_id = ?';
+      whereParams.push(filters.staffId);
+    }
+
+    const timeBlocks = await this.db.all(`SELECT * FROM time_blocks ${whereSql} ORDER BY date, start_time`, whereParams);
+
+    // Get staff names for each time block
+    const result = [];
+    for (const tb of timeBlocks) {
+      let staffName = 'Unknown';
+      if (tb.staff_id) {
+        const staff = await this.db.get('SELECT name FROM staff WHERE id = ?', [tb.staff_id]);
+        if (staff) staffName = staff.name;
+      }
+      result.push({
+        id: tb.id,
+        salonId: tb.salon_id,
+        staffId: tb.staff_id,
+        staffName,
+        date: tb.date,
+        startTime: tb.start_time,
+        endTime: tb.end_time,
+        reason: tb.reason,
+        createdAt: tb.created_at,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Create a new time block
+   */
+  async createTimeBlock(salonId: string, data: any) {
+    const { staffId, date, startTime, endTime, reason } = data;
+
+    if (!staffId || !date || !startTime || !endTime) {
+      throw new BadRequestException('staffId, date, startTime, and endTime are required');
+    }
+
+    // Verify staff exists and belongs to this salon
+    const staff = await this.db.get('SELECT * FROM staff WHERE id = ? AND salon_id = ?', [staffId, salonId]);
+    if (!staff) {
+      throw new NotFoundException(`Staff with ID ${staffId} not found`);
+    }
+
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    await this.db.run(
+      `INSERT INTO time_blocks (id, salon_id, staff_id, date, start_time, end_time, reason, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, salonId, staffId, date, startTime, endTime, reason || null, now],
+    );
+
+    const row = await this.db.get('SELECT * FROM time_blocks WHERE id = ?', [id]);
+    return {
+      id: row.id,
+      salonId: row.salon_id,
+      staffId: row.staff_id,
+      staffName: staff.name,
+      date: row.date,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      reason: row.reason,
+      createdAt: row.created_at,
+    };
+  }
+
+  /**
+   * Update a time block
+   */
+  async updateTimeBlock(id: string, salonId: string, data: any) {
+    const timeBlock = await this.db.get('SELECT * FROM time_blocks WHERE id = ? AND salon_id = ?', [id, salonId]);
+
+    if (!timeBlock) {
+      throw new NotFoundException(`Time block with ID ${id} not found`);
+    }
+
+    const { date, startTime, endTime, reason } = data;
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (date !== undefined) {
+      updates.push('date = ?');
+      params.push(date);
+    }
+    if (startTime !== undefined) {
+      updates.push('start_time = ?');
+      params.push(startTime);
+    }
+    if (endTime !== undefined) {
+      updates.push('end_time = ?');
+      params.push(endTime);
+    }
+    if (reason !== undefined) {
+      updates.push('reason = ?');
+      params.push(reason);
+    }
+
+    if (updates.length === 0) {
+      throw new BadRequestException('No fields to update');
+    }
+
+    params.push(id);
+    await this.db.run(`UPDATE time_blocks SET ${updates.join(', ')} WHERE id = ?`, params);
+
+    const row = await this.db.get('SELECT * FROM time_blocks WHERE id = ?', [id]);
+    let staffName = 'Unknown';
+    if (row.staff_id) {
+      const staff = await this.db.get('SELECT name FROM staff WHERE id = ?', [row.staff_id]);
+      if (staff) staffName = staff.name;
+    }
+
+    return {
+      id: row.id,
+      salonId: row.salon_id,
+      staffId: row.staff_id,
+      staffName,
+      date: row.date,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      reason: row.reason,
+      createdAt: row.created_at,
+    };
+  }
+
+  /**
+   * Delete a time block
+   */
+  async deleteTimeBlock(id: string, salonId: string) {
+    const timeBlock = await this.db.get('SELECT * FROM time_blocks WHERE id = ? AND salon_id = ?', [id, salonId]);
+
+    if (!timeBlock) {
+      throw new NotFoundException(`Time block with ID ${id} not found`);
+    }
+
+    await this.db.run('DELETE FROM time_blocks WHERE id = ?', [id]);
+    return { message: 'Time block deleted successfully' };
+  }
+
+  // ============ APPOINTMENT CREATION & MODIFICATION ============
+
+  /**
+   * Create a new appointment manually from calendar
+   * Required: clientId, staffId, serviceId, date, startTime
+   * Optional: notes, internalNotes
+   */
+  async createAppointment(salonId: string, data: any) {
+    const { clientId, staffId, serviceId, date, startTime, notes, internalNotes } = data;
+
+    if (!clientId || !staffId || !serviceId || !date || !startTime) {
+      throw new BadRequestException(
+        'clientId, staffId, serviceId, date, and startTime are required',
+      );
+    }
+
+    // Verify client exists
+    const client = await this.db.get('SELECT * FROM clients WHERE id = ? AND salon_id = ?', [clientId, salonId]);
+    if (!client) {
+      throw new NotFoundException(`Client with ID ${clientId} not found`);
+    }
+
+    // Verify staff exists
+    const staff = await this.db.get('SELECT * FROM staff WHERE id = ? AND salon_id = ?', [staffId, salonId]);
+    if (!staff) {
+      throw new NotFoundException(`Staff with ID ${staffId} not found`);
+    }
+
+    // Verify service exists and get price/duration
+    const service = await this.db.get('SELECT * FROM services WHERE id = ? AND salon_id = ?', [serviceId, salonId]);
+    if (!service) {
+      throw new NotFoundException(`Service with ID ${serviceId} not found`);
+    }
+
+    // Calculate end time based on service duration
+    const [h, m] = startTime.split(':').map(Number);
+    const totalMins = h * 60 + m + service.duration;
+    const endH = Math.floor(totalMins / 60);
+    const endM = totalMins % 60;
+    const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+    const appointmentId = crypto.randomUUID();
+    const appointmentServiceId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    // Insert appointment
+    await this.db.run(
+      `INSERT INTO appointments (id, salon_id, client_id, status, source, date, start_time, end_time,
+       total_price, total_duration, notes, internal_notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        appointmentId,
+        salonId,
+        clientId,
+        'PENDING',
+        'MANUAL',
+        date,
+        startTime,
+        endTime,
+        service.price,
+        service.duration,
+        notes || null,
+        internalNotes || null,
+        now,
+        now,
+      ],
+    );
+
+    // Insert appointment_services entry
+    await this.db.run(
+      `INSERT INTO appointment_services (id, appointment_id, service_id, staff_id, salon_id, price, duration, start_time, end_time, addons)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [appointmentServiceId, appointmentId, serviceId, staffId, salonId, service.price, service.duration, startTime, endTime, '[]'],
+    );
+
+    // Fetch and return the created appointment with joined data
+    const appointment = await this.db.get('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
+
+    return {
+      ...this.normalizeAppointment(appointment),
+      clientName: `${client.first_name} ${client.last_name}`.trim(),
+      serviceName: service.name,
+      staffName: staff.name,
+      services: [
+        {
+          id: appointmentServiceId,
+          appointmentId,
+          serviceId,
+          staffId,
+          price: service.price,
+          duration: service.duration,
+          startTime,
+          endTime,
+          addons: [],
+        },
+      ],
+    };
+  }
+
+  /**
+   * Update an appointment - can change staff, service, date/time, notes, etc.
+   * If service changes, updates appointment_services as well
+   * If time changes, recalculates end_time based on service duration
+   */
+  async updateAppointment(id: string, salonId: string, data: any) {
+    const appointment = await this.db.get(
+      'SELECT * FROM appointments WHERE id = ? AND salon_id = ?',
+      [id, salonId],
+    );
+
+    if (!appointment) {
+      throw new NotFoundException(`Appointment with ID ${id} not found`);
+    }
+
+    const { staffId, serviceId, date, startTime, notes, internalNotes } = data;
+
+    // If changing service, verify it exists and get new duration/price
+    let newService = null;
+    if (serviceId) {
+      newService = await this.db.get('SELECT * FROM services WHERE id = ? AND salon_id = ?', [serviceId, salonId]);
+      if (!newService) {
+        throw new NotFoundException(`Service with ID ${serviceId} not found`);
+      }
+    }
+
+    // If changing staff, verify it exists
+    if (staffId) {
+      const staff = await this.db.get('SELECT * FROM staff WHERE id = ? AND salon_id = ?', [staffId, salonId]);
+      if (!staff) {
+        throw new NotFoundException(`Staff with ID ${staffId} not found`);
+      }
+    }
+
+    // Calculate new end time if time or service changed
+    let newEndTime = appointment.end_time;
+    let finalStartTime = startTime || appointment.start_time;
+    let durationToUse = appointment.total_duration;
+
+    if (startTime || newService) {
+      // Need to recalculate end time
+      const timeToUse = startTime || appointment.start_time;
+      durationToUse = newService ? newService.duration : appointment.total_duration;
+
+      const [h, m] = timeToUse.split(':').map(Number);
+      const totalMins = h * 60 + m + durationToUse;
+      const endH = Math.floor(totalMins / 60);
+      const endM = totalMins % 60;
+      newEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+    }
+
+    // Update appointment
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (date !== undefined) {
+      updates.push('date = ?');
+      params.push(date);
+    }
+    if (startTime !== undefined) {
+      updates.push('start_time = ?');
+      params.push(startTime);
+    }
+    if (startTime || newService) {
+      updates.push('end_time = ?');
+      params.push(newEndTime);
+    }
+    if (newService) {
+      updates.push('total_price = ?');
+      params.push(newService.price);
+      updates.push('total_duration = ?');
+      params.push(newService.duration);
+    }
+    if (notes !== undefined) {
+      updates.push('notes = ?');
+      params.push(notes);
+    }
+    if (internalNotes !== undefined) {
+      updates.push('internal_notes = ?');
+      params.push(internalNotes);
+    }
+
+    if (updates.length > 0) {
+      updates.push('updated_at = ?');
+      params.push(new Date().toISOString());
+      params.push(id);
+      await this.db.run(`UPDATE appointments SET ${updates.join(', ')} WHERE id = ?`, params);
+    }
+
+    // Update appointment_services if service or staff changed
+    if (serviceId || staffId) {
+      const aptService = await this.db.get(
+        'SELECT * FROM appointment_services WHERE appointment_id = ? LIMIT 1',
+        [id],
+      );
+
+      if (aptService) {
+        const serviceUpdates: string[] = [];
+        const serviceParams: any[] = [];
+
+        if (staffId) {
+          serviceUpdates.push('staff_id = ?');
+          serviceParams.push(staffId);
+        }
+        if (serviceId) {
+          serviceUpdates.push('service_id = ?');
+          serviceParams.push(serviceId);
+          serviceUpdates.push('price = ?');
+          serviceParams.push(newService.price);
+          serviceUpdates.push('duration = ?');
+          serviceParams.push(newService.duration);
+        }
+        if (startTime || newService) {
+          serviceUpdates.push('start_time = ?');
+          serviceParams.push(finalStartTime);
+          serviceUpdates.push('end_time = ?');
+          serviceParams.push(newEndTime);
+        }
+
+        if (serviceUpdates.length > 0) {
+          serviceParams.push(aptService.id);
+          await this.db.run(
+            `UPDATE appointment_services SET ${serviceUpdates.join(', ')} WHERE id = ?`,
+            serviceParams,
+          );
+        }
+      }
+    }
+
+    // Fetch and return updated appointment
+    const updatedApt = await this.db.get('SELECT * FROM appointments WHERE id = ?', [id]);
+    const services = await this.db.all('SELECT * FROM appointment_services WHERE appointment_id = ?', [id]);
+    const client = await this.db.get('SELECT * FROM clients WHERE id = ?', [updatedApt.client_id]);
+
+    return {
+      ...this.normalizeAppointment(updatedApt),
+      clientName: client ? `${client.first_name} ${client.last_name}`.trim() : 'Unknown',
+      services: services.map(s => this.normalizeAppointmentService(s)),
     };
   }
 
