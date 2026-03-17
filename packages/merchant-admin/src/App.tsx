@@ -12,6 +12,7 @@ import { AppointmentsPage } from './pages/AppointmentsPage'
 import { CalendarPage } from './pages/CalendarPage'
 import { CustomersPage } from './pages/CustomersPage'
 import { GiftCardsPage } from './pages/GiftCardsPage'
+import { WebsiteEditorPage } from './pages/WebsiteEditorPage'
 
 function App() {
   return (
@@ -96,6 +97,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <BookingSettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/website-editor"
+            element={
+              <ProtectedRoute>
+                <WebsiteEditorPage />
               </ProtectedRoute>
             }
           />

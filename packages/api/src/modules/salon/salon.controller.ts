@@ -710,4 +710,68 @@ export class SalonController {
   async getDashboardStats(@CurrentUserDecorator() user: CurrentUser) {
     return this.salonService.getDashboardStats(user.salonId);
   }
+
+  // ============ WEBSITE CONFIG ============
+
+  /**
+   * GET /website-config - Get website configuration
+   */
+  @Get('/website-config')
+  async getWebsiteConfig(@CurrentUserDecorator() user: CurrentUser) {
+    return this.salonService.getWebsiteConfig(user.salonId);
+  }
+
+  /**
+   * PUT /website-config - Update website configuration
+   */
+  @Put('/website-config')
+  async updateWebsiteConfig(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Body() data: any,
+  ) {
+    return this.salonService.updateWebsiteConfig(user.salonId, data);
+  }
+
+  /**
+   * POST /website-config/publish - Publish website (trigger rebuild)
+   */
+  @Post('/website-config/publish')
+  async publishWebsite(@CurrentUserDecorator() user: CurrentUser) {
+    return this.salonService.publishWebsite(user.salonId);
+  }
+
+  // ============ MEDIA LIBRARY ============
+
+  /**
+   * GET /media - List media files
+   */
+  @Get('/media')
+  async listMedia(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Query('folder') folder?: string,
+  ) {
+    return this.salonService.listMedia(user.salonId, folder);
+  }
+
+  /**
+   * POST /media - Upload media file (accepts base64 or URL)
+   */
+  @Post('/media')
+  async uploadMedia(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Body() data: any,
+  ) {
+    return this.salonService.uploadMedia(user.salonId, data);
+  }
+
+  /**
+   * DELETE /media/:id - Delete media file
+   */
+  @Delete('/media/:id')
+  async deleteMedia(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.salonService.deleteMedia(user.salonId, id);
+  }
 }

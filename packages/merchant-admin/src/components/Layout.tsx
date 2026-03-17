@@ -23,6 +23,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/gift-cards', label: 'Gift Cards' },
     { path: '/services', label: 'Services' },
     { path: '/staff', label: 'Staff' },
+    { path: '/website-editor', label: 'Website Editor' },
     // Settings section
     { path: '/salon-settings', label: 'Salon Settings' },
     { path: '/business-hours', label: 'Business Hours' },

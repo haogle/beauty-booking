@@ -2905,4 +2905,257 @@ export class SalonService {
       updatedAt: row.updated_at,
     };
   }
+
+  // ============ WEBSITE CONFIG ============
+
+  async getWebsiteConfig(salonId: string) {
+    const row = await this.db.get<any>(
+      'SELECT * FROM website_configs WHERE salon_id = ?',
+      [salonId],
+    );
+
+    if (!row) {
+      // Return default config
+      return {
+        id: null,
+        salonId,
+        theme: {
+          primaryColor: '#8B5CF6',
+          secondaryColor: '#EC4899',
+          fontFamily: 'Inter',
+          borderRadius: '8px',
+        },
+        navbar: {
+          logo: '',
+          title: '',
+          links: [
+            { label: 'Home', href: '#hero', enabled: true },
+            { label: 'Services', href: '#services', enabled: true },
+            { label: 'About', href: '#about', enabled: true },
+            { label: 'Gallery', href: '#gallery', enabled: true },
+            { label: 'Contact', href: '#contact', enabled: true },
+          ],
+        },
+        announcement: '',
+        hero: {
+          enabled: true,
+          type: 'image',
+          title: 'Welcome to Our Salon',
+          subtitle: 'Your beauty is our passion',
+          backgroundImage: '',
+          ctaText: 'Book Now',
+          ctaLink: '/booking',
+        },
+        sections: [
+          { id: 'services', type: 'services', enabled: true, title: 'Our Services', subtitle: 'What we offer', order: 0 },
+          { id: 'about', type: 'about', enabled: true, title: 'About Us', subtitle: '', content: '', image: '', order: 1 },
+          { id: 'gallery', type: 'gallery', enabled: true, title: 'Gallery', subtitle: 'Our work', images: [], order: 2 },
+          { id: 'team', type: 'team', enabled: true, title: 'Our Team', subtitle: 'Meet our professionals', order: 3 },
+          { id: 'testimonials', type: 'testimonials', enabled: false, title: 'Testimonials', subtitle: 'What our clients say', items: [], order: 4 },
+          { id: 'contact', type: 'contact', enabled: true, title: 'Contact Us', subtitle: '', order: 5 },
+        ],
+        footer: {
+          enabled: true,
+          text: '',
+          showSocial: true,
+          socialLinks: { facebook: '', instagram: '', twitter: '', tiktok: '' },
+        },
+        servicePage: {
+          layout: 'grid',
+          showPrices: true,
+          showDuration: true,
+          showDescription: true,
+          coverImage: '',
+        },
+        seo: {
+          title: '',
+          description: '',
+          keywords: '',
+          ogImage: '',
+        },
+        publishedAt: null,
+        updatedAt: null,
+      };
+    }
+
+    return {
+      id: row.id,
+      salonId: row.salon_id,
+      theme: this.parseJson(row.theme, {}),
+      navbar: this.parseJson(row.navbar, {}),
+      announcement: row.announcement || '',
+      hero: this.parseJson(row.hero, {}),
+      sections: this.parseJson(row.sections, []),
+      footer: this.parseJson(row.footer, {}),
+      servicePage: this.parseJson(row.service_page, {}),
+      seo: this.parseJson(row.seo, {}),
+      publishedAt: row.published_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  async updateWebsiteConfig(salonId: string, data: any) {
+    const now = new Date().toISOString();
+
+    const existing = await this.db.get<any>(
+      'SELECT id FROM website_configs WHERE salon_id = ?',
+      [salonId],
+    );
+
+    if (!existing) {
+      const id = this.db.generateId();
+      await this.db.run(
+        `INSERT INTO website_configs (id, salon_id, theme, navbar, announcement, hero, sections, footer, service_page, seo, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          salonId,
+          JSON.stringify(data.theme || {}),
+          JSON.stringify(data.navbar || {}),
+          data.announcement || '',
+          JSON.stringify(data.hero || {}),
+          JSON.stringify(data.sections || []),
+          JSON.stringify(data.footer || {}),
+          JSON.stringify(data.servicePage || {}),
+          JSON.stringify(data.seo || {}),
+          now,
+        ],
+      );
+    } else {
+      await this.db.run(
+        `UPDATE website_configs SET
+          theme = ?, navbar = ?, announcement = ?, hero = ?,
+          sections = ?, footer = ?, service_page = ?, seo = ?, updated_at = ?
+         WHERE salon_id = ?`,
+        [
+          JSON.stringify(data.theme || {}),
+          JSON.stringify(data.navbar || {}),
+          data.announcement || '',
+          JSON.stringify(data.hero || {}),
+          JSON.stringify(data.sections || []),
+          JSON.stringify(data.footer || {}),
+          JSON.stringify(data.servicePage || {}),
+          JSON.stringify(data.seo || {}),
+          now,
+          salonId,
+        ],
+      );
+    }
+
+    return this.getWebsiteConfig(salonId);
+  }
+
+  async publishWebsite(salonId: string) {
+    const now = new Date().toISOString();
+
+    const existing = await this.db.get<any>(
+      'SELECT id FROM website_configs WHERE salon_id = ?',
+      [salonId],
+    );
+
+    if (!existing) {
+      throw new BadRequestException('No website configuration found. Please save your config first.');
+    }
+
+    await this.db.run(
+      'UPDATE website_configs SET published_at = ?, updated_at = ? WHERE salon_id = ?',
+      [now, now, salonId],
+    );
+
+    return { published: true, publishedAt: now };
+  }
+
+  // ============ MEDIA LIBRARY ============
+
+  async listMedia(salonId: string, folder?: string) {
+    let sql = 'SELECT * FROM media_files WHERE salon_id = ?';
+    const params: any[] = [salonId];
+
+    if (folder) {
+      sql += ' AND folder = ?';
+      params.push(folder);
+    }
+
+    sql += ' ORDER BY created_at DESC';
+
+    const rows = await this.db.all<any>(sql, params);
+    return rows.map((row: any) => ({
+      id: row.id,
+      salonId: row.salon_id,
+      folder: row.folder,
+      filename: row.filename,
+      url: row.url,
+      mimeType: row.mime_type,
+      sizeBytes: row.size_bytes,
+      width: row.width,
+      height: row.height,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async uploadMedia(salonId: string, data: any) {
+    const id = this.db.generateId();
+    const now = new Date().toISOString();
+
+    const { filename, url, mimeType, sizeBytes, width, height, folder } = data;
+
+    if (!filename || !url) {
+      throw new BadRequestException('filename and url are required');
+    }
+
+    await this.db.run(
+      `INSERT INTO media_files (id, salon_id, folder, filename, url, mime_type, size_bytes, width, height, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        salonId,
+        folder || '/',
+        filename,
+        url,
+        mimeType || 'image/jpeg',
+        sizeBytes || 0,
+        width || null,
+        height || null,
+        now,
+      ],
+    );
+
+    return {
+      id,
+      salonId,
+      folder: folder || '/',
+      filename,
+      url,
+      mimeType: mimeType || 'image/jpeg',
+      sizeBytes: sizeBytes || 0,
+      width: width || null,
+      height: height || null,
+      createdAt: now,
+    };
+  }
+
+  async deleteMedia(salonId: string, id: string) {
+    const row = await this.db.get<any>(
+      'SELECT * FROM media_files WHERE id = ? AND salon_id = ?',
+      [id, salonId],
+    );
+
+    if (!row) {
+      throw new NotFoundException('Media file not found');
+    }
+
+    await this.db.run('DELETE FROM media_files WHERE id = ? AND salon_id = ?', [id, salonId]);
+    return { deleted: true };
+  }
+
+  // Helper to safely parse JSON strings
+  private parseJson(value: any, defaultValue: any) {
+    if (!value) return defaultValue;
+    if (typeof value === 'object') return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return defaultValue;
+    }
+  }
 }

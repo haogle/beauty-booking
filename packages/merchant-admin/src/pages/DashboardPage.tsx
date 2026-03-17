@@ -245,6 +245,17 @@ export const DashboardPage: React.FC = () => {
               <span className="text-sm font-semibold text-gray-700 text-center">Business Hours</span>
             </Link>
 
+            {/* Website Editor */}
+            <Link
+              to="/website-editor"
+              className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors group"
+            >
+              <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center text-3xl mb-3 group-hover:bg-teal-200 transition-colors">
+                🌐
+              </div>
+              <span className="text-sm font-semibold text-gray-700 text-center">Website</span>
+            </Link>
+
             {/* Booking Settings */}
             <Link
               to="/booking-settings"
