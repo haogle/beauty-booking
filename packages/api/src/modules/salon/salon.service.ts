@@ -478,7 +478,7 @@ export class SalonService {
   /**
    * Get all services grouped by category with addons
    */
-  async getServices(salonId: string) {
+  async getServices(salonId: string, includeInactive = false) {
     // Verify salon exists
     await this.getSalon(salonId);
 
@@ -491,9 +491,10 @@ export class SalonService {
     // For each category, get its services and their addons
     const result = [];
     for (const category of categories) {
+      const activeFilter = includeInactive ? '' : 'AND s.is_active = 1';
       const services = await this.db.all(
         `SELECT s.* FROM services s
-         WHERE s.salon_id = ? AND s.category_id = ? AND s.is_active = 1
+         WHERE s.salon_id = ? AND s.category_id = ? ${activeFilter}
          ORDER BY s.sort_order ASC`,
         [salonId, category.id],
       );

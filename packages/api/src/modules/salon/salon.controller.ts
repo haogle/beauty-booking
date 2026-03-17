@@ -155,7 +155,8 @@ export class SalonController {
    */
   @Get('/services')
   async getServices(@CurrentUserDecorator() user: CurrentUser) {
-    return this.salonService.getServices(user.salonId);
+    // Merchant admin sees all services including inactive ones
+    return this.salonService.getServices(user.salonId, true);
   }
 
   /**
