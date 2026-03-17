@@ -269,7 +269,10 @@ export const CalendarPage: React.FC = () => {
   }
 
   const formatDate = (date: Date) => {
-    return date.toISOString().split('T')[0]
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    const d = String(date.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
   }
 
   const formatTime = (time: string) => {
@@ -327,11 +330,12 @@ export const CalendarPage: React.FC = () => {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth()
     const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
-    const prevLastDay = new Date(year, month, 0)
 
+    // Calculate Monday-based offset (grid starts on Monday)
+    const dayOfWeek = firstDay.getDay() // 0=Sun, 1=Mon, ...
+    const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1
     const startDate = new Date(firstDay)
-    startDate.setDate(startDate.getDate() - firstDay.getDay())
+    startDate.setDate(startDate.getDate() - mondayOffset)
 
     const days: MonthDay[] = []
     const current = new Date(startDate)
