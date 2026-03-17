@@ -1059,20 +1059,32 @@ export class PlatformService {
     const bookings = await this.db.all<any>(
       `SELECT a.id, a.salon_id, a.date, a.start_time, a.end_time, a.status,
               a.total_price, a.notes, a.created_at,
-              a.customer_name, a.customer_email, a.customer_phone,
-              st.name as staff_name,
-              s.name as service_name
+              c.first_name || ' ' || c.last_name as customer_name,
+              c.email as customer_email,
+              c.phone as customer_phone
        FROM appointments a
-       LEFT JOIN staff st ON a.staff_id = st.id
-       LEFT JOIN services s ON a.service_id = s.id
+       LEFT JOIN clients c ON a.client_id = c.id
        WHERE a.salon_id = ?
        ORDER BY a.date DESC, a.start_time DESC
        LIMIT ? OFFSET ?`,
       [salonId, pageSize, skip],
     );
 
-    return {
-      data: bookings.map(b => ({
+    // For each booking, get the first service and staff from appointment_services
+    const enrichedBookings = [];
+    for (const b of bookings) {
+      const apptService = await this.db.get<any>(
+        `SELECT aps.price, aps.duration,
+                sv.name as service_name,
+                st.name as staff_name
+         FROM appointment_services aps
+         LEFT JOIN services sv ON aps.service_id = sv.id
+         LEFT JOIN staff st ON aps.staff_id = st.id
+         WHERE aps.appointment_id = ?
+         LIMIT 1`,
+        [b.id],
+      );
+      enrichedBookings.push({
         id: b.id,
         salonId: b.salon_id,
         date: b.date,
@@ -1084,10 +1096,14 @@ export class PlatformService {
         customerName: b.customer_name,
         customerEmail: b.customer_email,
         customerPhone: b.customer_phone,
-        staffName: b.staff_name,
-        serviceName: b.service_name,
+        staffName: apptService?.staff_name || '—',
+        serviceName: apptService?.service_name || '—',
         createdAt: b.created_at,
-      })),
+      });
+    }
+
+    return {
+      data: enrichedBookings,
       total,
       page,
       pageSize,
