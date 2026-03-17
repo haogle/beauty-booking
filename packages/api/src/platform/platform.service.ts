@@ -809,4 +809,215 @@ export class PlatformService {
     }
     return results;
   }
+
+  // ============================================================================
+  // DASHBOARD STATS
+  // ============================================================================
+
+  async getDashboardStats(): Promise<any> {
+    const customerCount = await this.db.get<{ count: number }>('SELECT COUNT(*) as count FROM customers', []);
+    const accountCount = await this.db.get<{ count: number }>('SELECT COUNT(*) as count FROM accounts WHERE status != ?', ['DELETED']);
+    const activeAccountCount = await this.db.get<{ count: number }>('SELECT COUNT(*) as count FROM accounts WHERE status = ?', ['ACTIVE']);
+    const salonCount = await this.db.get<{ count: number }>('SELECT COUNT(*) as count FROM salons WHERE status = ?', ['ACTIVE']);
+    const totalSalonCount = await this.db.get<{ count: number }>('SELECT COUNT(*) as count FROM salons', []);
+
+    // Today's appointments across all salons
+    const today = new Date().toISOString().split('T')[0];
+    const todayAppointments = await this.db.get<{ count: number }>(
+      'SELECT COUNT(*) as count FROM appointments WHERE date = ?',
+      [today],
+    );
+
+    // Total revenue (completed appointments)
+    const totalRevenue = await this.db.get<{ total: number }>(
+      'SELECT COALESCE(SUM(total_price), 0) as total FROM appointments WHERE status = ?',
+      ['COMPLETED'],
+    );
+
+    // Recent signups (last 7 days)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const recentAccounts = await this.db.all<any>(
+      `SELECT a.id, a.username, a.platform_name, a.created_at, c.name as customer_name
+       FROM accounts a
+       LEFT JOIN customers c ON a.customer_id = c.id
+       WHERE a.created_at >= ? AND a.status != ?
+       ORDER BY a.created_at DESC LIMIT 10`,
+      [sevenDaysAgo, 'DELETED'],
+    );
+
+    const recentSalons = await this.db.all<any>(
+      `SELECT s.id, s.name, s.subdomain, s.status, s.created_at, a.username as account_username
+       FROM salons s
+       LEFT JOIN accounts a ON s.account_id = a.id
+       WHERE s.created_at >= ?
+       ORDER BY s.created_at DESC LIMIT 10`,
+      [sevenDaysAgo],
+    );
+
+    return {
+      totalCustomers: customerCount?.count || 0,
+      totalAccounts: accountCount?.count || 0,
+      activeAccounts: activeAccountCount?.count || 0,
+      totalSalons: totalSalonCount?.count || 0,
+      activeSalons: salonCount?.count || 0,
+      todayAppointments: todayAppointments?.count || 0,
+      totalRevenue: totalRevenue?.total || 0,
+      recentAccounts: recentAccounts.map(a => ({
+        id: a.id,
+        username: a.username,
+        platformName: a.platform_name,
+        customerName: a.customer_name,
+        createdAt: a.created_at,
+      })),
+      recentSalons: recentSalons.map(s => ({
+        id: s.id,
+        name: s.name,
+        subdomain: s.subdomain,
+        status: s.status,
+        accountUsername: s.account_username,
+        createdAt: s.created_at,
+      })),
+    };
+  }
+
+  // ============================================================================
+  // ALL SALONS (CROSS-ACCOUNT)
+  // ============================================================================
+
+  async listAllSalons(
+    page: number = 1,
+    pageSize: number = 10,
+    search?: string,
+    status?: string,
+  ): Promise<PaginatedResponse<any>> {
+    const skip = (page - 1) * pageSize;
+    const params: any[] = [];
+
+    let countSql = 'SELECT COUNT(*) as count FROM salons s LEFT JOIN accounts a ON s.account_id = a.id';
+    let dataSql = `
+      SELECT s.id, s.account_id, s.name, s.subdomain, s.custom_domain, s.status,
+             s.industry, s.currency, s.timezone, s.phone, s.email, s.logo_url,
+             s.address_line1, s.city, s.state, s.zip_code,
+             s.created_at, s.updated_at,
+             a.username as account_username, a.platform_name,
+             c.name as customer_name
+      FROM salons s
+      LEFT JOIN accounts a ON s.account_id = a.id
+      LEFT JOIN customers c ON a.customer_id = c.id
+    `;
+
+    const conditions: string[] = [];
+
+    if (status) {
+      conditions.push('s.status = ?');
+      params.push(status);
+    }
+
+    if (search) {
+      const searchTerm = '%' + search + '%';
+      conditions.push('(s.name LIKE ? OR s.subdomain LIKE ? OR a.username LIKE ? OR c.name LIKE ?)');
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    if (conditions.length > 0) {
+      const whereClause = ' WHERE ' + conditions.join(' AND ');
+      countSql += whereClause;
+      dataSql += whereClause;
+    }
+
+    dataSql += ' ORDER BY s.created_at DESC LIMIT ? OFFSET ?';
+    params.push(pageSize, skip);
+
+    const countParams = params.slice(0, params.length - 2);
+    const countResult = await this.db.get<{ count: number }>(countSql, countParams);
+    const total = countResult?.count || 0;
+
+    const salons = await this.db.all<any>(dataSql, params);
+
+    // Get staff count and service count for each salon
+    const enriched = [];
+    for (const salon of salons) {
+      const staffCount = await this.db.get<{ count: number }>(
+        'SELECT COUNT(*) as count FROM staff WHERE salon_id = ? AND is_active = 1',
+        [salon.id],
+      );
+      const serviceCount = await this.db.get<{ count: number }>(
+        'SELECT COUNT(*) as count FROM services WHERE salon_id = ? AND is_active = 1',
+        [salon.id],
+      );
+      enriched.push({
+        id: salon.id,
+        accountId: salon.account_id,
+        name: salon.name,
+        subdomain: salon.subdomain,
+        customDomain: salon.custom_domain,
+        status: salon.status,
+        industry: salon.industry,
+        currency: salon.currency,
+        timezone: salon.timezone,
+        phone: salon.phone,
+        email: salon.email,
+        logoUrl: salon.logo_url,
+        addressLine1: salon.address_line1,
+        city: salon.city,
+        state: salon.state,
+        zipCode: salon.zip_code,
+        createdAt: salon.created_at,
+        updatedAt: salon.updated_at,
+        accountUsername: salon.account_username,
+        platformName: salon.platform_name,
+        customerName: salon.customer_name,
+        staffCount: staffCount?.count || 0,
+        serviceCount: serviceCount?.count || 0,
+      });
+    }
+
+    return {
+      data: enriched,
+      total,
+      page,
+      pageSize,
+    };
+  }
+
+  async updateSalon(id: string, data: any): Promise<any> {
+    const salon = await this.db.get('SELECT * FROM salons WHERE id = ?', [id]);
+    if (!salon) {
+      throw new NotFoundException('Salon not found');
+    }
+
+    const updates: string[] = ['updated_at = ?'];
+    const params: any[] = [new Date().toISOString()];
+
+    const fields: Record<string, string> = {
+      name: 'name',
+      subdomain: 'subdomain',
+      customDomain: 'custom_domain',
+      status: 'status',
+      industry: 'industry',
+      currency: 'currency',
+      timezone: 'timezone',
+      phone: 'phone',
+      email: 'email',
+      logoUrl: 'logo_url',
+      addressLine1: 'address_line1',
+      addressLine2: 'address_line2',
+      city: 'city',
+      state: 'state',
+      zipCode: 'zip_code',
+      country: 'country',
+    };
+
+    for (const [key, col] of Object.entries(fields)) {
+      if (data[key] !== undefined) {
+        updates.push(col + ' = ?');
+        params.push(data[key]);
+      }
+    }
+
+    params.push(id);
+    await this.db.run(`UPDATE salons SET ${updates.join(', ')} WHERE id = ?`, params);
+
+    return this.getSalon(id);
+  }
 }

@@ -4,36 +4,56 @@ import api from '../lib/api'
 import Layout from '../components/Layout'
 import Pagination from '../components/Pagination'
 
-interface Account {
+interface Customer {
   id: string
   name: string
-  email: string
-  businessName: string
-  phone: string
+}
+
+interface Account {
+  id: string
+  customerId: string
+  username: string
+  platformName: string
   status: string
+  uuid: string
+  lastLoginAt: string | null
+  notes: string
   createdAt: string
+  updatedAt: string
+  customerName: string
+  salonCount: number
 }
 
 interface AccountResponse {
   data: Account[]
   total: number
-  page: number
-  limit: number
+}
+
+interface CreateAccountForm {
+  customerId: string
+  username: string
+  password: string
+  platformName: string
+  notes: string
 }
 
 const AccountsPage: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [usernameFilter, setUsernameFilter] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [newAccount, setNewAccount] = useState({
-    name: '',
-    email: '',
-    businessName: '',
-    phone: '',
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [loadingCustomers, setLoadingCustomers] = useState(false)
+  const [formData, setFormData] = useState<CreateAccountForm>({
+    customerId: '',
+    username: '',
+    password: '',
+    platformName: '',
+    notes: '',
   })
   const [isCreating, setIsCreating] = useState(false)
 
@@ -41,19 +61,27 @@ const AccountsPage: React.FC = () => {
 
   useEffect(() => {
     fetchAccounts()
-  }, [currentPage, searchQuery])
+  }, [currentPage, usernameFilter])
 
   const fetchAccounts = async () => {
     try {
       setIsLoading(true)
-      const params = {
+      setError('')
+      const params: any = {
         page: currentPage,
-        limit,
-        ...(searchQuery && { search: searchQuery }),
+        pageSize: limit,
       }
-      const response = await api.get<AccountResponse>('/api/v1/platform/accounts', { params })
-      setAccounts(response.data.data || [])
-      setTotalPages(Math.ceil((response.data.total || 0) / limit))
+      if (usernameFilter) {
+        params.search = usernameFilter
+      }
+
+      const response = await api.get('/api/v1/platform/accounts', { params })
+      const result = response.data?.data || response.data
+      const accountsData = result.data || []
+      const total = result.total || 0
+
+      setAccounts(accountsData)
+      setTotalPages(Math.ceil(total / limit))
     } catch (err: any) {
       setError('Failed to load accounts')
       console.error(err)
@@ -62,15 +90,59 @@ const AccountsPage: React.FC = () => {
     }
   }
 
+  const fetchCustomers = async () => {
+    try {
+      setLoadingCustomers(true)
+      const response = await api.get('/api/v1/platform/customers?pageSize=100')
+      const result = response.data?.data || response.data
+      const customersList = Array.isArray(result) ? result : result.data || []
+      setCustomers(customersList)
+    } catch (err: any) {
+      console.error('Failed to fetch customers:', err)
+      setError('Failed to load customers list')
+    } finally {
+      setLoadingCustomers(false)
+    }
+  }
+
+  const handleOpenCreateModal = async () => {
+    setShowCreateModal(true)
+    if (customers.length === 0) {
+      await fetchCustomers()
+    }
+  }
+
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!formData.customerId || !formData.username || !formData.password || !formData.platformName) {
+      setError('Please fill in all required fields')
+      return
+    }
+
     setIsCreating(true)
+    setError('')
 
     try {
-      await api.post('/api/v1/platform/accounts', newAccount)
-      setNewAccount({ name: '', email: '', businessName: '', phone: '' })
+      await api.post('/api/v1/platform/accounts', {
+        customerId: formData.customerId,
+        username: formData.username,
+        password: formData.password,
+        platformName: formData.platformName,
+        notes: formData.notes,
+      })
+
+      setFormData({
+        customerId: '',
+        username: '',
+        password: '',
+        platformName: '',
+        notes: '',
+      })
       setShowCreateModal(false)
       setCurrentPage(1)
+      setSuccessMessage('Account created successfully')
+      setTimeout(() => setSuccessMessage(''), 3000)
       await fetchAccounts()
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to create account')
@@ -79,21 +151,54 @@ const AccountsPage: React.FC = () => {
     }
   }
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value)
+  const handleUsernameFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUsernameFilter(e.target.value)
     setCurrentPage(1)
+  }
+
+  const getStatusColor = (status: string) => {
+    const statusLower = status.toLowerCase()
+    if (statusLower === 'active') {
+      return 'bg-green-100 text-green-800'
+    } else if (statusLower === 'suspended') {
+      return 'bg-yellow-100 text-yellow-800'
+    } else if (statusLower === 'deleted') {
+      return 'bg-red-100 text-red-800'
+    }
+    return 'bg-gray-100 text-gray-800'
+  }
+
+  const getPlatformColor = (platform: string) => {
+    const platformLower = platform.toLowerCase()
+    if (platformLower.includes('pink')) {
+      return 'bg-pink-100 text-pink-800'
+    } else if (platformLower.includes('blue')) {
+      return 'bg-blue-100 text-blue-800'
+    } else if (platformLower.includes('purple')) {
+      return 'bg-purple-100 text-purple-800'
+    }
+    return 'bg-gray-100 text-gray-800'
+  }
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'Never'
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
   }
 
   return (
     <Layout>
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Accounts</h1>
-          <p className="text-gray-600 mt-2">Manage salon owner accounts</p>
+          <h1 className="text-3xl font-bold text-gray-900">Platform Accounts</h1>
+          <p className="text-gray-600 mt-2">Manage salon platform accounts and access</p>
         </div>
         <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          onClick={handleOpenCreateModal}
+          className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors font-medium"
         >
           Add Account
         </button>
@@ -105,13 +210,19 @@ const AccountsPage: React.FC = () => {
         </div>
       )}
 
+      {successMessage && (
+        <div className="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
+          {successMessage}
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <input
           type="text"
-          placeholder="Search accounts by name, email, or business..."
-          value={searchQuery}
-          onChange={handleSearch}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Search by username..."
+          value={usernameFilter}
+          onChange={handleUsernameFilterChange}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
         />
       </div>
 
@@ -129,11 +240,12 @@ const AccountsPage: React.FC = () => {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Name</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Email</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Business</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Phone</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Customer</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Username</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Platform</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Salons</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Last Login</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Created</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Actions</th>
                 </tr>
@@ -141,22 +253,33 @@ const AccountsPage: React.FC = () => {
               <tbody className="divide-y divide-gray-200">
                 {accounts.map((account) => (
                   <tr key={account.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{account.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{account.email}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{account.businessName}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{account.phone}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{account.customerName}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{account.username}</td>
                     <td className="px-6 py-4 text-sm">
-                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPlatformColor(account.platformName)}`}>
+                        {account.platformName}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">
+                        {account.salonCount}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(account.status)}`}>
                         {account.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {new Date(account.createdAt).toLocaleDateString()}
+                      {formatDate(account.lastLoginAt)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {formatDate(account.createdAt)}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <Link
                         to={`/accounts/${account.id}`}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
+                        className="text-pink-600 hover:text-pink-800 font-medium"
                       >
                         View
                       </Link>
@@ -177,70 +300,94 @@ const AccountsPage: React.FC = () => {
 
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Add New Account</h2>
+          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Account</h2>
 
-            <form onSubmit={handleCreateAccount} className="space-y-4">
+            <form onSubmit={handleCreateAccount} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Customer *</label>
+                <select
+                  value={formData.customerId}
+                  onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
+                  disabled={loadingCustomers}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                >
+                  <option value="">Select a customer...</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Username *</label>
                 <input
                   type="text"
-                  value={newAccount.name}
-                  onChange={(e) => setNewAccount({ ...newAccount, name: e.target.value })}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Account Owner Name"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  placeholder="username"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
                 <input
-                  type="email"
-                  value={newAccount.email}
-                  onChange={(e) => setNewAccount({ ...newAccount, email: e.target.value })}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="owner@example.com"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="••••••••"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Business Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Platform Name *</label>
                 <input
                   type="text"
-                  value={newAccount.businessName}
-                  onChange={(e) => setNewAccount({ ...newAccount, businessName: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Business Name"
+                  value={formData.platformName}
+                  onChange={(e) => setFormData({ ...formData, platformName: e.target.value })}
+                  placeholder="e.g., PINK PINK, Beautiful Salon"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <input
-                  type="tel"
-                  value={newAccount.phone}
-                  onChange={(e) => setNewAccount({ ...newAccount, phone: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="+1 (555) 123-4567"
+                <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Optional notes about this account"
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
                 />
               </div>
 
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => {
+                    setShowCreateModal(false)
+                    setFormData({
+                      customerId: '',
+                      username: '',
+                      password: '',
+                      platformName: '',
+                      notes: '',
+                    })
+                  }}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isCreating}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                  disabled={isCreating || loadingCustomers}
+                  className="flex-1 px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
                 >
-                  {isCreating ? 'Creating...' : 'Create'}
+                  {isCreating ? 'Creating...' : 'Create Account'}
                 </button>
               </div>
             </form>

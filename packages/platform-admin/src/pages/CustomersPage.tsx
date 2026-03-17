@@ -9,15 +9,18 @@ interface Customer {
   name: string
   email: string
   phone: string
-  status: string
-  createdAt: string
+  operator: string
+  notes: string
+  created_at: string
+  updated_at: string
+  accountCount: number
 }
 
 interface CustomerResponse {
   data: Customer[]
   total: number
   page: number
-  limit: number
+  pageSize: number
 }
 
 const CustomersPage: React.FC = () => {
@@ -28,7 +31,13 @@ const CustomersPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '' })
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    operator: '',
+    notes: '',
+  })
   const [isCreating, setIsCreating] = useState(false)
 
   const limit = 10
@@ -42,12 +51,13 @@ const CustomersPage: React.FC = () => {
       setIsLoading(true)
       const params = {
         page: currentPage,
-        limit,
+        pageSize: limit,
         ...(searchQuery && { search: searchQuery }),
       }
-      const response = await api.get<CustomerResponse>('/api/v1/platform/customers', { params })
-      setCustomers(response.data.data || [])
-      setTotalPages(Math.ceil((response.data.total || 0) / limit))
+      const response = await api.get('/api/v1/platform/customers', { params })
+      const result = response.data?.data || response.data
+      setCustomers(result.data || [])
+      setTotalPages(Math.ceil((result.total || 0) / limit))
     } catch (err: any) {
       setError('Failed to load customers')
       console.error(err)
@@ -62,7 +72,7 @@ const CustomersPage: React.FC = () => {
 
     try {
       await api.post('/api/v1/platform/customers', newCustomer)
-      setNewCustomer({ name: '', email: '', phone: '' })
+      setNewCustomer({ name: '', email: '', phone: '', operator: '', notes: '' })
       setShowCreateModal(false)
       setCurrentPage(1)
       await fetchCustomers()
@@ -83,7 +93,7 @@ const CustomersPage: React.FC = () => {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
-          <p className="text-gray-600 mt-2">Manage platform customers</p>
+          <p className="text-gray-600 mt-2">Manage platform customers and their accounts</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
@@ -102,7 +112,7 @@ const CustomersPage: React.FC = () => {
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <input
           type="text"
-          placeholder="Search customers by name or email..."
+          placeholder="Search customers by name, email, or phone..."
           value={searchQuery}
           onChange={handleSearch}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -126,7 +136,7 @@ const CustomersPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Name</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Email</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Phone</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Accounts</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Created</th>
                   <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Actions</th>
                 </tr>
@@ -135,15 +145,15 @@ const CustomersPage: React.FC = () => {
                 {customers.map((customer) => (
                   <tr key={customer.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{customer.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{customer.email}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{customer.phone}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{customer.email || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{customer.phone || '-'}</td>
                     <td className="px-6 py-4 text-sm">
-                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                        {customer.status}
+                      <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                        {customer.accountCount || 0}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {new Date(customer.createdAt).toLocaleDateString()}
+                      {new Date(customer.created_at).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <Link
@@ -169,12 +179,12 @@ const CustomersPage: React.FC = () => {
 
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md max-h-screen overflow-auto">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Add New Customer</h2>
 
             <form onSubmit={handleCreateCustomer} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
                 <input
                   type="text"
                   value={newCustomer.name}
@@ -191,7 +201,6 @@ const CustomersPage: React.FC = () => {
                   type="email"
                   value={newCustomer.email}
                   onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
-                  required
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="customer@example.com"
                 />
@@ -205,6 +214,28 @@ const CustomersPage: React.FC = () => {
                   onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="+1 (555) 123-4567"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Operator</label>
+                <input
+                  type="text"
+                  value={newCustomer.operator}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, operator: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Operator Name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea
+                  value={newCustomer.notes}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, notes: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Add any notes about this customer"
+                  rows={3}
                 />
               </div>
 

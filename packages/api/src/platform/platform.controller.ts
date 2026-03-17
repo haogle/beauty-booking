@@ -25,6 +25,15 @@ export class PlatformController {
   constructor(private platformService: PlatformService) {}
 
   // ============================================================================
+  // DASHBOARD
+  // ============================================================================
+
+  @Get('dashboard')
+  async getDashboardStats() {
+    return this.platformService.getDashboardStats();
+  }
+
+  // ============================================================================
   // CUSTOMER ENDPOINTS
   // ============================================================================
 
@@ -126,6 +135,27 @@ export class PlatformController {
   @Get('accounts/:accountId/salons')
   async listSalonsForAccount(@Param('accountId') accountId: string) {
     return this.platformService.listSalonsForAccount(accountId);
+  }
+
+  // ============================================================================
+  // ALL SALONS (CROSS-ACCOUNT)
+  // ============================================================================
+
+  @Get('salons')
+  async listAllSalons(
+    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+    @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize?: number,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    const p = page || 1;
+    const ps = pageSize || 10;
+    return this.platformService.listAllSalons(p, ps, search, status);
+  }
+
+  @Put('salons/:id')
+  async updateSalon(@Param('id') id: string, @Body() data: any) {
+    return this.platformService.updateSalon(id, data);
   }
 
   @Get('salons/:id')

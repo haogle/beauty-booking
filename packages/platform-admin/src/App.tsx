@@ -8,6 +8,9 @@ import CustomersPage from './pages/CustomersPage'
 import CustomerDetailPage from './pages/CustomerDetailPage'
 import AccountsPage from './pages/AccountsPage'
 import AccountDetailPage from './pages/AccountDetailPage'
+import SalonsPage from './pages/SalonsPage'
+import SalonDetailPage from './pages/SalonDetailPage'
+import SettingsPage from './pages/SettingsPage'
 
 const App: React.FC = () => {
   return (
@@ -57,6 +60,33 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute>
                 <AccountDetailPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/salons"
+            element={
+              <ProtectedRoute>
+                <SalonsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/salons/:id"
+            element={
+              <ProtectedRoute>
+                <SalonDetailPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
               </ProtectedRoute>
             }
           />
