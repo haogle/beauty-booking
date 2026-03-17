@@ -3087,9 +3087,27 @@ export class SalonService {
       throw new BadRequestException('No website configuration found. Please save your config first.');
     }
 
+    // Get the fully merged config and save it back so the published version has all defaults
+    const mergedConfig = await this.getWebsiteConfig(salonId);
     await this.db.run(
-      'UPDATE website_configs SET published_at = ?, updated_at = ? WHERE salon_id = ?',
-      [now, now, salonId],
+      `UPDATE website_configs SET
+        theme = ?, navbar = ?, announcement = ?, hero = ?,
+        sections = ?, footer = ?, service_page = ?, seo = ?,
+        published_at = ?, updated_at = ?
+       WHERE salon_id = ?`,
+      [
+        JSON.stringify(mergedConfig.theme || {}),
+        JSON.stringify(mergedConfig.navbar || {}),
+        mergedConfig.announcement || '',
+        JSON.stringify(mergedConfig.hero || {}),
+        JSON.stringify(mergedConfig.sections || []),
+        JSON.stringify(mergedConfig.footer || {}),
+        JSON.stringify(mergedConfig.servicePage || {}),
+        JSON.stringify(mergedConfig.seo || {}),
+        now,
+        now,
+        salonId,
+      ],
     );
 
     return { published: true, publishedAt: now };

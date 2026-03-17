@@ -518,15 +518,45 @@ export class PublicService {
       return null;
     }
 
+    // Merge defaults for any empty stored values
+    const defaultTheme = { primaryColor: '#8B5CF6', secondaryColor: '#EC4899', fontFamily: 'Inter', borderRadius: '8px' };
+    const defaultNavbar = { logo: '', title: '', links: [
+      { label: 'Home', href: '#hero', enabled: true },
+      { label: 'Services', href: '#services', enabled: true },
+      { label: 'About', href: '#about', enabled: true },
+      { label: 'Gallery', href: '#gallery', enabled: true },
+      { label: 'Contact', href: '#contact', enabled: true },
+    ]};
+    const defaultHero = { enabled: true, type: 'image', title: 'Welcome to Our Salon', subtitle: 'Your beauty is our passion', backgroundImage: '', ctaText: 'Book Now', ctaLink: '/booking' };
+    const defaultSections = [
+      { id: 'services', type: 'services', enabled: true, title: 'Our Services', subtitle: 'What we offer', order: 0 },
+      { id: 'about', type: 'about', enabled: true, title: 'About Us', subtitle: '', content: '', image: '', order: 1 },
+      { id: 'gallery', type: 'gallery', enabled: true, title: 'Gallery', subtitle: 'Our work', images: [], order: 2 },
+      { id: 'team', type: 'team', enabled: true, title: 'Our Team', subtitle: 'Meet our professionals', order: 3 },
+      { id: 'testimonials', type: 'testimonials', enabled: false, title: 'Testimonials', subtitle: 'What our clients say', items: [], order: 4 },
+      { id: 'contact', type: 'contact', enabled: true, title: 'Contact Us', subtitle: '', order: 5 },
+    ];
+    const defaultFooter = { enabled: true, text: '', showSocial: true, socialLinks: { facebook: '', instagram: '', twitter: '', tiktok: '' } };
+    const defaultServicePage = { layout: 'grid', showPrices: true, showDuration: true, showDescription: true, coverImage: '' };
+    const defaultSeo = { title: '', description: '', keywords: '', ogImage: '' };
+
+    const storedTheme = this.parseJson(row.theme, {});
+    const storedNavbar = this.parseJson(row.navbar, {});
+    const storedHero = this.parseJson(row.hero, {});
+    const storedSections = this.parseJson(row.sections, []);
+    const storedFooter = this.parseJson(row.footer, {});
+    const storedServicePage = this.parseJson(row.service_page, {});
+    const storedSeo = this.parseJson(row.seo, {});
+
     return {
-      theme: this.parseJson(row.theme, {}),
-      navbar: this.parseJson(row.navbar, {}),
+      theme: { ...defaultTheme, ...storedTheme },
+      navbar: Object.keys(storedNavbar).length > 0 ? { ...defaultNavbar, ...storedNavbar } : defaultNavbar,
       announcement: row.announcement || '',
-      hero: this.parseJson(row.hero, {}),
-      sections: this.parseJson(row.sections, []),
-      footer: this.parseJson(row.footer, {}),
-      servicePage: this.parseJson(row.service_page, {}),
-      seo: this.parseJson(row.seo, {}),
+      hero: Object.keys(storedHero).length > 0 ? { ...defaultHero, ...storedHero } : defaultHero,
+      sections: storedSections.length > 0 ? storedSections : defaultSections,
+      footer: Object.keys(storedFooter).length > 0 ? { ...defaultFooter, ...storedFooter } : defaultFooter,
+      servicePage: Object.keys(storedServicePage).length > 0 ? { ...defaultServicePage, ...storedServicePage } : defaultServicePage,
+      seo: Object.keys(storedSeo).length > 0 ? { ...defaultSeo, ...storedSeo } : defaultSeo,
       publishedAt: row.published_at,
     };
   }
