@@ -9,10 +9,14 @@ interface Appointment {
   startTime: string
   duration: number
   clientName: string
+  clientPhone?: string
   serviceName: string
+  servicePrice?: number
   staffName: string
   staffId?: string
-  status: 'PENDING' | 'CONFIRMED' | 'IN_SERVICE' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
+  status: 'PENDING' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
+  tip?: number
+  notes?: string
 }
 
 interface AppointmentsResponse {
@@ -23,10 +27,19 @@ interface AppointmentsResponse {
   totalPages: number
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Pending Confirmation',
+  CONFIRMED: 'Confirmed',
+  IN_PROGRESS: 'Checked In',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+  NO_SHOW: 'No Show',
+}
+
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   PENDING: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
   CONFIRMED: { bg: 'bg-blue-100', text: 'text-blue-700' },
-  IN_SERVICE: { bg: 'bg-purple-100', text: 'text-purple-700' },
+  IN_PROGRESS: { bg: 'bg-purple-100', text: 'text-purple-700' },
   COMPLETED: { bg: 'bg-green-100', text: 'text-green-700' },
   CANCELLED: { bg: 'bg-red-100', text: 'text-red-700' },
   NO_SHOW: { bg: 'bg-gray-100', text: 'text-gray-700' },
@@ -44,6 +57,12 @@ export const AppointmentsPage: React.FC = () => {
   const [filterStaffId, setFilterStaffId] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
+  const [editingTip, setEditingTip] = useState(false)
+  const [tipValue, setTipValue] = useState('')
+  const [actionLoading, setActionLoading] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
 
   useEffect(() => {
     fetchAppointments()
@@ -88,39 +107,81 @@ export const AppointmentsPage: React.FC = () => {
     }
   }
 
-  const updateAppointmentStatus = async (id: string, status: string) => {
+  const callWorkflowEndpoint = async (id: string, endpoint: string, body?: any) => {
     try {
-      await api.put(`/api/v1/merchant/salon/appointments/${id}/status`, { status })
-      setSuccess('Appointment updated successfully')
+      setActionLoading(true)
+      await api.patch(`/api/v1/merchant/salon/appointments/${id}/${endpoint}`, body || {})
+      setSuccess(`Appointment ${endpoint} successfully`)
       setTimeout(() => setSuccess(''), 3000)
       await fetchAppointments()
+
+      if (selectedAppointment?.id === id) {
+        const updated = appointments.find(a => a.id === id)
+        if (updated) setSelectedAppointment(updated)
+      }
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message)
       } else {
-        setError('Failed to update appointment')
+        setError(`Failed to ${endpoint} appointment`)
       }
+    } finally {
+      setActionLoading(false)
     }
   }
 
   const handleConfirm = (id: string) => {
-    updateAppointmentStatus(id, 'CONFIRMED')
+    callWorkflowEndpoint(id, 'confirm')
+  }
+
+  const handleCheckIn = (id: string) => {
+    callWorkflowEndpoint(id, 'checkin')
   }
 
   const handleComplete = (id: string) => {
-    updateAppointmentStatus(id, 'COMPLETED')
+    callWorkflowEndpoint(id, 'complete')
   }
 
   const handleCancel = (id: string) => {
-    if (confirm('Are you sure you want to cancel this appointment?')) {
-      updateAppointmentStatus(id, 'CANCELLED')
+    const reason = prompt('Please provide a reason for cancellation:')
+    if (reason !== null) {
+      callWorkflowEndpoint(id, 'cancel', { reason })
     }
   }
 
   const handleNoShow = (id: string) => {
-    if (confirm('Mark this appointment as no-show?')) {
-      updateAppointmentStatus(id, 'NO_SHOW')
+    if (window.confirm('Mark this appointment as no-show?')) {
+      callWorkflowEndpoint(id, 'no-show')
     }
+  }
+
+  const handleTipUpdate = async (id: string) => {
+    try {
+      setActionLoading(true)
+      await api.patch(`/api/v1/merchant/salon/appointments/${id}/tip`, { tip: parseFloat(tipValue) || 0 })
+      setSuccess('Tip updated successfully')
+      setTimeout(() => setSuccess(''), 3000)
+      await fetchAppointments()
+
+      if (selectedAppointment?.id === id) {
+        const updated = appointments.find(a => a.id === id)
+        if (updated) setSelectedAppointment(updated)
+      }
+      setEditingTip(false)
+      setTipValue('')
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError('Failed to update tip')
+      }
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const getStatusLabel = (status: string) => {
+    return STATUS_LABELS[status] || status
   }
 
   const getStatusColor = (status: string) => {
@@ -181,9 +242,9 @@ export const AppointmentsPage: React.FC = () => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="ALL">All Statuses</option>
-                <option value="PENDING">Pending</option>
+                <option value="PENDING">Pending Confirmation</option>
                 <option value="CONFIRMED">Confirmed</option>
-                <option value="IN_SERVICE">In Service</option>
+                <option value="IN_PROGRESS">Checked In</option>
                 <option value="COMPLETED">Completed</option>
                 <option value="CANCELLED">Cancelled</option>
                 <option value="NO_SHOW">No Show</option>
@@ -245,7 +306,16 @@ export const AppointmentsPage: React.FC = () => {
                   {appointments.map((apt) => {
                     const colors = getStatusColor(apt.status)
                     return (
-                      <tr key={apt.id} className="border-b border-gray-200 hover:bg-gray-50">
+                      <tr
+                        key={apt.id}
+                        className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
+                        onClick={() => {
+                          setSelectedAppointment(apt)
+                          setEditingTip(false)
+                          setTipValue('')
+                          setCancelReason('')
+                        }}
+                      >
                         <td className="px-6 py-4 text-gray-800 font-semibold">{apt.date}</td>
                         <td className="px-6 py-4 text-gray-700">{apt.time}</td>
                         <td className="px-6 py-4 text-gray-700">{apt.clientName}</td>
@@ -255,44 +325,16 @@ export const AppointmentsPage: React.FC = () => {
                           <span
                             className={`${colors.bg} ${colors.text} px-3 py-1 rounded-full text-xs font-semibold`}
                           >
-                            {apt.status}
+                            {getStatusLabel(apt.status)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="flex justify-center gap-2 flex-wrap">
-                            {apt.status === 'PENDING' && (
-                              <button
-                                onClick={() => handleConfirm(apt.id)}
-                                className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded transition-colors"
-                              >
-                                Confirm
-                              </button>
-                            )}
-                            {(apt.status === 'CONFIRMED' || apt.status === 'IN_SERVICE') && (
-                              <button
-                                onClick={() => handleComplete(apt.id)}
-                                className="bg-green-500 hover:bg-green-600 text-white text-xs py-1 px-2 rounded transition-colors"
-                              >
-                                Complete
-                              </button>
-                            )}
-                            {apt.status !== 'COMPLETED' && apt.status !== 'CANCELLED' && (
-                              <button
-                                onClick={() => handleCancel(apt.id)}
-                                className="bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded transition-colors"
-                              >
-                                Cancel
-                              </button>
-                            )}
-                            {apt.status !== 'NO_SHOW' && apt.status !== 'COMPLETED' && apt.status !== 'CANCELLED' && (
-                              <button
-                                onClick={() => handleNoShow(apt.id)}
-                                className="bg-gray-500 hover:bg-gray-600 text-white text-xs py-1 px-2 rounded transition-colors"
-                              >
-                                No Show
-                              </button>
-                            )}
-                          </div>
+                        <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => setSelectedAppointment(apt)}
+                            className="bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-3 rounded transition-colors"
+                          >
+                            View Details
+                          </button>
                         </td>
                       </tr>
                     )
@@ -332,6 +374,219 @@ export const AppointmentsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Appointment Detail Drawer */}
+      {selectedAppointment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setSelectedAppointment(null)}>
+          <div
+            className="absolute right-0 top-0 h-full w-96 bg-white shadow-lg overflow-y-auto z-50 animate-slide-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
+              <h3 className="text-xl font-bold text-gray-800">Appointment Details</h3>
+              <button
+                onClick={() => setSelectedAppointment(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Status Badge */}
+              <div className="flex justify-center">
+                <span
+                  className={`${getStatusColor(selectedAppointment.status).bg} ${getStatusColor(selectedAppointment.status).text} px-6 py-3 rounded-full text-lg font-bold`}
+                >
+                  {getStatusLabel(selectedAppointment.status)}
+                </span>
+              </div>
+
+              {/* Client Info */}
+              <div className="border-b border-gray-200 pb-4">
+                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Client Information</h4>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-gray-500">Name</p>
+                    <p className="text-gray-800 font-semibold">{selectedAppointment.clientName}</p>
+                  </div>
+                  {selectedAppointment.clientPhone && (
+                    <div>
+                      <p className="text-xs text-gray-500">Phone</p>
+                      <p className="text-gray-800">{selectedAppointment.clientPhone}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Service Details */}
+              <div className="border-b border-gray-200 pb-4">
+                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Service Details</h4>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-gray-500">Service</p>
+                    <p className="text-gray-800 font-semibold">{selectedAppointment.serviceName}</p>
+                  </div>
+                  {selectedAppointment.servicePrice !== undefined && (
+                    <div>
+                      <p className="text-xs text-gray-500">Price</p>
+                      <p className="text-gray-800">${selectedAppointment.servicePrice.toFixed(2)}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs text-gray-500">Duration</p>
+                    <p className="text-gray-800">{selectedAppointment.duration} minutes</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Assigned Staff</p>
+                    <p className="text-gray-800 font-semibold">{selectedAppointment.staffName}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Date & Time */}
+              <div className="border-b border-gray-200 pb-4">
+                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Date & Time</h4>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-gray-500">Date</p>
+                    <p className="text-gray-800 font-semibold">{selectedAppointment.date}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Time</p>
+                    <p className="text-gray-800 font-semibold">{selectedAppointment.time}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tip */}
+              <div className="border-b border-gray-200 pb-4">
+                <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Tip</h4>
+                {editingTip ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={tipValue}
+                      onChange={(e) => setTipValue(e.target.value)}
+                      placeholder="Enter tip amount"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={() => handleTipUpdate(selectedAppointment.id)}
+                      disabled={actionLoading}
+                      className="bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white px-3 py-2 rounded-lg transition-colors"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingTip(false)
+                        setTipValue('')
+                      }}
+                      className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-2 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center">
+                    <p className="text-lg font-bold text-gray-800">
+                      ${(selectedAppointment.tip || 0).toFixed(2)}
+                    </p>
+                    <button
+                      onClick={() => {
+                        setEditingTip(true)
+                        setTipValue((selectedAppointment.tip || 0).toString())
+                      }}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 text-sm rounded-lg transition-colors"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Notes */}
+              {selectedAppointment.notes && (
+                <div className="border-b border-gray-200 pb-4">
+                  <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">Notes</h4>
+                  <p className="text-gray-700 text-sm">{selectedAppointment.notes}</p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="border-t border-gray-200 pt-4 space-y-2">
+                {selectedAppointment.status === 'PENDING' && (
+                  <button
+                    onClick={() => handleConfirm(selectedAppointment.id)}
+                    disabled={actionLoading}
+                    className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Confirm Appointment
+                  </button>
+                )}
+
+                {selectedAppointment.status === 'CONFIRMED' && (
+                  <button
+                    onClick={() => handleCheckIn(selectedAppointment.id)}
+                    disabled={actionLoading}
+                    className="w-full bg-purple-500 hover:bg-purple-600 disabled:bg-purple-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Check In
+                  </button>
+                )}
+
+                {selectedAppointment.status === 'IN_PROGRESS' && (
+                  <button
+                    onClick={() => handleComplete(selectedAppointment.id)}
+                    disabled={actionLoading}
+                    className="w-full bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Complete
+                  </button>
+                )}
+
+                {['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(selectedAppointment.status) && (
+                  <button
+                    onClick={() => handleCancel(selectedAppointment.id)}
+                    disabled={actionLoading}
+                    className="w-full bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                )}
+
+                {['PENDING', 'CONFIRMED', 'IN_PROGRESS'].includes(selectedAppointment.status) && (
+                  <button
+                    onClick={() => handleNoShow(selectedAppointment.id)}
+                    disabled={actionLoading}
+                    className="w-full bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Mark as No Show
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+        .animate-slide-in {
+          animation: slideIn 0.3s ease-out;
+        }
+      `}</style>
     </Layout>
   )
 }

@@ -1236,6 +1236,150 @@ export class SalonService {
     return this.normalizeAppointment(row);
   }
 
+  /**
+   * Confirm an appointment (set status to CONFIRMED)
+   */
+  async confirmAppointment(salonId: string, appointmentId: string) {
+    const appointment = await this.db.get(
+      'SELECT * FROM appointments WHERE id = ? AND salon_id = ?',
+      [appointmentId, salonId],
+    );
+
+    if (!appointment) {
+      throw new NotFoundException(`Appointment with ID ${appointmentId} not found`);
+    }
+
+    const now = new Date().toISOString();
+    await this.db.run(
+      'UPDATE appointments SET status = ?, updated_at = ? WHERE id = ?',
+      ['CONFIRMED', now, appointmentId],
+    );
+
+    const row = await this.db.get('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
+    return this.normalizeAppointment(row);
+  }
+
+  /**
+   * Check in an appointment (set status to IN_PROGRESS)
+   */
+  async checkinAppointment(salonId: string, appointmentId: string) {
+    const appointment = await this.db.get(
+      'SELECT * FROM appointments WHERE id = ? AND salon_id = ?',
+      [appointmentId, salonId],
+    );
+
+    if (!appointment) {
+      throw new NotFoundException(`Appointment with ID ${appointmentId} not found`);
+    }
+
+    const now = new Date().toISOString();
+    await this.db.run(
+      'UPDATE appointments SET status = ?, updated_at = ? WHERE id = ?',
+      ['IN_PROGRESS', now, appointmentId],
+    );
+
+    const row = await this.db.get('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
+    return this.normalizeAppointment(row);
+  }
+
+  /**
+   * Complete an appointment (set status to COMPLETED and set completed_at timestamp)
+   */
+  async completeAppointment(salonId: string, appointmentId: string) {
+    const appointment = await this.db.get(
+      'SELECT * FROM appointments WHERE id = ? AND salon_id = ?',
+      [appointmentId, salonId],
+    );
+
+    if (!appointment) {
+      throw new NotFoundException(`Appointment with ID ${appointmentId} not found`);
+    }
+
+    const now = new Date().toISOString();
+    await this.db.run(
+      'UPDATE appointments SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?',
+      ['COMPLETED', now, now, appointmentId],
+    );
+
+    const row = await this.db.get('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
+    return this.normalizeAppointment(row);
+  }
+
+  /**
+   * Cancel an appointment (set status to CANCELLED, set cancelled_at timestamp, optionally store reason in internal_notes)
+   */
+  async cancelAppointment(salonId: string, appointmentId: string, reason?: string) {
+    const appointment = await this.db.get(
+      'SELECT * FROM appointments WHERE id = ? AND salon_id = ?',
+      [appointmentId, salonId],
+    );
+
+    if (!appointment) {
+      throw new NotFoundException(`Appointment with ID ${appointmentId} not found`);
+    }
+
+    const now = new Date().toISOString();
+    const internalNotes = reason ? (appointment.internal_notes ? `${appointment.internal_notes}\n[Cancelled: ${reason}]` : `[Cancelled: ${reason}]`) : appointment.internal_notes;
+
+    await this.db.run(
+      'UPDATE appointments SET status = ?, cancelled_at = ?, internal_notes = ?, updated_at = ? WHERE id = ?',
+      ['CANCELLED', now, internalNotes, now, appointmentId],
+    );
+
+    const row = await this.db.get('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
+    return this.normalizeAppointment(row);
+  }
+
+  /**
+   * Mark appointment as no-show (set status to NO_SHOW)
+   */
+  async noShowAppointment(salonId: string, appointmentId: string) {
+    const appointment = await this.db.get(
+      'SELECT * FROM appointments WHERE id = ? AND salon_id = ?',
+      [appointmentId, salonId],
+    );
+
+    if (!appointment) {
+      throw new NotFoundException(`Appointment with ID ${appointmentId} not found`);
+    }
+
+    const now = new Date().toISOString();
+    await this.db.run(
+      'UPDATE appointments SET status = ?, updated_at = ? WHERE id = ?',
+      ['NO_SHOW', now, appointmentId],
+    );
+
+    const row = await this.db.get('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
+    return this.normalizeAppointment(row);
+  }
+
+  /**
+   * Update appointment tip amount
+   */
+  async updateAppointmentTip(salonId: string, appointmentId: string, tip: number) {
+    const appointment = await this.db.get(
+      'SELECT * FROM appointments WHERE id = ? AND salon_id = ?',
+      [appointmentId, salonId],
+    );
+
+    if (!appointment) {
+      throw new NotFoundException(`Appointment with ID ${appointmentId} not found`);
+    }
+
+    if (tip < 0) {
+      throw new BadRequestException('Tip amount cannot be negative');
+    }
+
+    const now = new Date().toISOString();
+    await this.db.run(
+      'UPDATE appointments SET tip = ?, updated_at = ? WHERE id = ?',
+      [tip, now, appointmentId],
+    );
+
+    const row = await this.db.get('SELECT * FROM appointments WHERE id = ?', [appointmentId]);
+    return this.normalizeAppointment(row);
+  }
+
   // ============ CLIENT/CUSTOMER MANAGEMENT ============
 
   /**
@@ -1463,42 +1607,154 @@ export class SalonService {
     await this.getSalon(salonId);
 
     const today = new Date().toISOString().split('T')[0];
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0];
 
-    // Today's bookings
-    const todayBookings = await this.db.get(
-      'SELECT COUNT(*) as count FROM appointments WHERE salon_id = ? AND date = ?',
+    // Today's revenue (completed appointments only)
+    const todayRevenueRow = await this.db.get(
+      `SELECT SUM(total_price) as total FROM appointments
+       WHERE salon_id = ? AND date = ? AND status = 'COMPLETED'`,
       [salonId, today],
     );
+    const todayRevenue = todayRevenueRow?.total || 0;
 
-    // Upcoming bookings (future appointments)
-    const upcomingBookings = await this.db.get(
+    // Today's appointments (all statuses)
+    const todayAppointmentsRow = await this.db.get(
       `SELECT COUNT(*) as count FROM appointments
-       WHERE salon_id = ? AND date > ? AND status IN ('PENDING', 'CONFIRMED', 'IN_SERVICE')`,
+       WHERE salon_id = ? AND date = ?`,
       [salonId, today],
     );
+    const todayAppointments = todayAppointmentsRow?.count || 0;
+
+    // Week revenue (last 7 days, completed appointments only)
+    const weekRevenueRow = await this.db.get(
+      `SELECT SUM(total_price) as total FROM appointments
+       WHERE salon_id = ? AND date >= ? AND date <= ? AND status = 'COMPLETED'`,
+      [salonId, sevenDaysAgo, today],
+    );
+    const weekRevenue = weekRevenueRow?.total || 0;
 
     // Total clients
-    const totalClients = await this.db.get(
-      'SELECT COUNT(*) as count FROM clients WHERE salon_id = ?',
+    const totalClientsRow = await this.db.get(
+      `SELECT COUNT(*) as count FROM clients WHERE salon_id = ?`,
+      [salonId],
+    );
+    const totalClients = totalClientsRow?.count || 0;
+
+    // Recent appointments (last 5, ordered by date descending)
+    const recentApts = await this.db.all(
+      `SELECT * FROM appointments
+       WHERE salon_id = ?
+       ORDER BY date DESC, start_time DESC
+       LIMIT 5`,
       [salonId],
     );
 
-    // Month revenue
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    const monthStartStr = monthStart.toISOString().split('T')[0];
+    const recentAppointments = [];
+    for (const apt of recentApts) {
+      const client = await this.db.get(`SELECT first_name, last_name FROM clients WHERE id = ?`, [
+        apt.client_id,
+      ]);
+      const clientName = client
+        ? `${client.first_name} ${client.last_name}`.trim()
+        : 'Unknown';
 
-    const monthRevenue = await this.db.get(
-      `SELECT SUM(total_price) as total FROM appointments
-       WHERE salon_id = ? AND date >= ? AND status IN ('COMPLETED')`,
-      [salonId, monthStartStr],
+      // Get first service and staff info
+      const aptService = await this.db.get(
+        `SELECT service_id, staff_id FROM appointment_services WHERE appointment_id = ? LIMIT 1`,
+        [apt.id],
+      );
+
+      let serviceName = 'Unknown';
+      let staffName = 'Unknown';
+      if (aptService) {
+        if (aptService.service_id) {
+          const svc = await this.db.get(`SELECT name FROM services WHERE id = ?`, [
+            aptService.service_id,
+          ]);
+          serviceName = svc?.name || 'Unknown';
+        }
+        if (aptService.staff_id) {
+          const staff = await this.db.get(`SELECT name FROM staff WHERE id = ?`, [
+            aptService.staff_id,
+          ]);
+          staffName = staff?.name || 'Unknown';
+        }
+      }
+
+      recentAppointments.push({
+        id: apt.id,
+        clientName,
+        serviceName,
+        staffName,
+        status: apt.status,
+        date: apt.date,
+        time: apt.start_time,
+        price: apt.total_price,
+      });
+    }
+
+    // Upcoming appointments (next 5, today or future, PENDING or CONFIRMED status)
+    const upcomingApts = await this.db.all(
+      `SELECT * FROM appointments
+       WHERE salon_id = ? AND date >= ? AND status IN ('PENDING', 'CONFIRMED')
+       ORDER BY date ASC, start_time ASC
+       LIMIT 5`,
+      [salonId, today],
     );
 
+    const upcomingAppointments = [];
+    for (const apt of upcomingApts) {
+      const client = await this.db.get(`SELECT first_name, last_name FROM clients WHERE id = ?`, [
+        apt.client_id,
+      ]);
+      const clientName = client
+        ? `${client.first_name} ${client.last_name}`.trim()
+        : 'Unknown';
+
+      // Get first service and staff info
+      const aptService = await this.db.get(
+        `SELECT service_id, staff_id FROM appointment_services WHERE appointment_id = ? LIMIT 1`,
+        [apt.id],
+      );
+
+      let serviceName = 'Unknown';
+      let staffName = 'Unknown';
+      if (aptService) {
+        if (aptService.service_id) {
+          const svc = await this.db.get(`SELECT name FROM services WHERE id = ?`, [
+            aptService.service_id,
+          ]);
+          serviceName = svc?.name || 'Unknown';
+        }
+        if (aptService.staff_id) {
+          const staff = await this.db.get(`SELECT name FROM staff WHERE id = ?`, [
+            aptService.staff_id,
+          ]);
+          staffName = staff?.name || 'Unknown';
+        }
+      }
+
+      upcomingAppointments.push({
+        id: apt.id,
+        clientName,
+        serviceName,
+        staffName,
+        status: apt.status,
+        date: apt.date,
+        time: apt.start_time,
+        price: apt.total_price,
+      });
+    }
+
     return {
-      todayBookings: todayBookings?.count || 0,
-      upcomingBookings: upcomingBookings?.count || 0,
-      totalClients: totalClients?.count || 0,
-      monthRevenue: monthRevenue?.total || 0,
+      todayRevenue,
+      todayAppointments,
+      weekRevenue,
+      totalClients,
+      recentAppointments,
+      upcomingAppointments,
     };
   }
 

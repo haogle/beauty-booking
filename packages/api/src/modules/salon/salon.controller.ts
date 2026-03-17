@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Put,
+  Patch,
   Post,
   Delete,
   UseGuards,
@@ -393,6 +394,80 @@ export class SalonController {
     return this.salonService.updateAppointmentStatus(id, user.salonId, data.status);
   }
 
+  /**
+   * PATCH /appointments/:id/confirm - Confirm an appointment
+   */
+  @Patch('/appointments/:id/confirm')
+  @Roles('OWNER', 'RECEPTIONIST', 'TECHNICIAN')
+  async confirmAppointment(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.salonService.confirmAppointment(user.salonId, id);
+  }
+
+  /**
+   * PATCH /appointments/:id/checkin - Check in an appointment
+   */
+  @Patch('/appointments/:id/checkin')
+  @Roles('OWNER', 'RECEPTIONIST', 'TECHNICIAN')
+  async checkinAppointment(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.salonService.checkinAppointment(user.salonId, id);
+  }
+
+  /**
+   * PATCH /appointments/:id/complete - Complete an appointment
+   */
+  @Patch('/appointments/:id/complete')
+  @Roles('OWNER', 'RECEPTIONIST', 'TECHNICIAN')
+  async completeAppointment(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.salonService.completeAppointment(user.salonId, id);
+  }
+
+  /**
+   * PATCH /appointments/:id/cancel - Cancel an appointment with optional reason
+   */
+  @Patch('/appointments/:id/cancel')
+  @Roles('OWNER', 'RECEPTIONIST', 'TECHNICIAN')
+  async cancelAppointment(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Param('id') id: string,
+    @Body() data?: { reason?: string },
+  ) {
+    return this.salonService.cancelAppointment(user.salonId, id, data?.reason);
+  }
+
+  /**
+   * PATCH /appointments/:id/no-show - Mark appointment as no-show
+   */
+  @Patch('/appointments/:id/no-show')
+  @Roles('OWNER', 'RECEPTIONIST', 'TECHNICIAN')
+  async noShowAppointment(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Param('id') id: string,
+  ) {
+    return this.salonService.noShowAppointment(user.salonId, id);
+  }
+
+  /**
+   * PATCH /appointments/:id/tip - Update appointment tip
+   */
+  @Patch('/appointments/:id/tip')
+  @Roles('OWNER', 'RECEPTIONIST', 'TECHNICIAN')
+  async updateAppointmentTip(
+    @CurrentUserDecorator() user: CurrentUser,
+    @Param('id') id: string,
+    @Body() data: { tip: number },
+  ) {
+    return this.salonService.updateAppointmentTip(user.salonId, id, data.tip);
+  }
+
   // ============ CLIENT/CUSTOMER MANAGEMENT ============
 
   /**
@@ -546,9 +621,9 @@ export class SalonController {
   // ============ DASHBOARD STATS ============
 
   /**
-   * GET /dashboard/stats - Return dashboard statistics
+   * GET /dashboard - Return dashboard statistics
    */
-  @Get('/dashboard/stats')
+  @Get('/dashboard')
   async getDashboardStats(@CurrentUserDecorator() user: CurrentUser) {
     return this.salonService.getDashboardStats(user.salonId);
   }
