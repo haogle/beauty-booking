@@ -17,7 +17,7 @@ interface StaffMember {
   phone: string
   role: 'OWNER' | 'TECHNICIAN' | 'RECEPTIONIST'
   bio?: string
-  active?: boolean
+  isActive?: boolean
   services?: string[]
   workHours?: WorkHours[]
 }
@@ -183,18 +183,20 @@ export const StaffPage: React.FC = () => {
     }
   }
 
-  const handleDeleteStaff = async (id: string) => {
-    if (!confirm('Are you sure you want to deactivate this staff member?')) return
+  const handleToggleActive = async (member: StaffMember) => {
+    const newActive = !member.isActive
+    const action = newActive ? 'activate' : 'deactivate'
+    if (!confirm(`Are you sure you want to ${action} ${member.firstName} ${member.lastName}?`)) return
     try {
-      await api.delete(`/api/v1/merchant/salon/staff/${id}`)
-      setSuccess('Staff member deactivated successfully')
+      await api.put(`/api/v1/merchant/salon/staff/${member.id}`, { isActive: newActive })
+      setSuccess(`Staff member ${action}d successfully`)
       setTimeout(() => setSuccess(''), 3000)
       await fetchStaff()
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message)
       } else {
-        setError('Failed to deactivate staff member')
+        setError(`Failed to ${action} staff member`)
       }
     }
   }
@@ -310,12 +312,12 @@ export const StaffPage: React.FC = () => {
                     <p className="text-sm text-gray-600">{member.role}</p>
                     <span
                       className={`text-xs font-semibold px-2 py-1 rounded mt-1 inline-block ${
-                        member.active
+                        member.isActive
                           ? 'bg-green-100 text-green-700'
                           : 'bg-gray-100 text-gray-700'
                       }`}
                     >
-                      {member.active ? 'Active' : 'Inactive'}
+                      {member.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </div>
                 </div>
@@ -348,10 +350,14 @@ export const StaffPage: React.FC = () => {
                     {expandedStaffId === member.id ? 'Hide Details' : 'Services & Hours'}
                   </button>
                   <button
-                    onClick={() => member.id && handleDeleteStaff(member.id)}
-                    className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+                    onClick={() => member.id && handleToggleActive(member)}
+                    className={`w-full font-semibold py-2 px-4 rounded-lg transition-colors text-sm ${
+                      member.isActive
+                        ? 'bg-red-500 hover:bg-red-600 text-white'
+                        : 'bg-green-500 hover:bg-green-600 text-white'
+                    }`}
                   >
-                    Deactivate
+                    {member.isActive ? 'Deactivate' : 'Activate'}
                   </button>
                 </div>
               </div>
