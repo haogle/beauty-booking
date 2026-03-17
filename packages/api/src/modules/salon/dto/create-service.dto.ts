@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsInt, IsOptional, IsUrl, Min } from 'class-validator';
+import { IsString, IsNumber, IsInt, IsOptional, Min } from 'class-validator';
 
 export class CreateServiceDto {
   @IsString()
@@ -25,6 +25,6 @@ export class CreateServiceDto {
   sortOrder?: number;
 
   @IsOptional()
-  @IsUrl()
+  @IsString()
   coverImageUrl?: string;
 }
