@@ -171,7 +171,7 @@ const AccountDetailPage: React.FC = () => {
         const result = res.data?.data || res.data
         setStaff(Array.isArray(result) ? result : [])
       } else if (tab === 'bookings') {
-        const res = await api.get(`/api/v1/platform/salons/${salonId}/bookings`)
+        const res = await api.get(`/api/v1/platform/salons/${salonId}/bookings?page=1&pageSize=20`)
         const result = res.data?.data || res.data
         setBookings(result.data || [])
         setBookingTotal(result.total || 0)

@@ -176,10 +176,12 @@ export class PlatformController {
   @Get('salons/:id/bookings')
   async getSalonBookings(
     @Param('id') id: string,
-    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
-    @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize?: number,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
-    return this.platformService.getSalonBookings(id, page || 1, pageSize || 20);
+    const p = page ? parseInt(page, 10) : 1;
+    const ps = pageSize ? parseInt(pageSize, 10) : 20;
+    return this.platformService.getSalonBookings(id, p, ps);
   }
 
   // ============================================================================
