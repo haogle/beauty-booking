@@ -10,8 +10,10 @@ interface Appointment {
   staffName: string
   status: 'PENDING' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
   date: string
-  startTime: string
-  totalPrice: number
+  time: string
+  startTime?: string
+  price: number
+  totalPrice?: number
 }
 
 interface DashboardData {
@@ -43,7 +45,9 @@ const getStatusBadgeColor = (status: string): string => {
 }
 
 const formatDate = (dateString: string): string => {
+  if (!dateString) return ''
   const date = new Date(dateString)
+  if (isNaN(date.getTime())) return dateString
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
@@ -288,13 +292,13 @@ export const DashboardPage: React.FC = () => {
                       <div className="space-y-1">
                         <p>
                           <span className="font-medium">📅</span> {formatDate(apt.date)} at{' '}
-                          {formatTime(apt.startTime)}
+                          {formatTime(apt.time || apt.startTime || '')}
                         </p>
                         <p>
                           <span className="font-medium">👤</span> {apt.staffName}
                         </p>
                       </div>
-                      <p className="font-semibold text-gray-900">${apt.totalPrice.toFixed(2)}</p>
+                      <p className="font-semibold text-gray-900">${(apt.price ?? apt.totalPrice ?? 0).toFixed(2)}</p>
                     </div>
                   </Link>
                 ))}
@@ -334,13 +338,13 @@ export const DashboardPage: React.FC = () => {
                       <div className="space-y-1">
                         <p>
                           <span className="font-medium">📅</span> {formatDate(apt.date)} at{' '}
-                          {formatTime(apt.startTime)}
+                          {formatTime(apt.time || apt.startTime || '')}
                         </p>
                         <p>
                           <span className="font-medium">👤</span> {apt.staffName}
                         </p>
                       </div>
-                      <p className="font-semibold text-gray-900">${apt.totalPrice.toFixed(2)}</p>
+                      <p className="font-semibold text-gray-900">${(apt.price ?? apt.totalPrice ?? 0).toFixed(2)}</p>
                     </div>
                   </Link>
                 ))}
