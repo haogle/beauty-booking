@@ -80,7 +80,7 @@ export class PublicService {
     const serviceIds = services.map((s) => s.id);
     let addons: any[] = [];
     if (serviceIds.length > 0) {
-      const placeholders = serviceIds.map((_, i) => `$${i + 1}`).join(',');
+      const placeholders = serviceIds.map(() => '?').join(',');
       addons = await this.db.all(
         `SELECT * FROM service_addons WHERE service_id IN (${placeholders}) ORDER BY sort_order ASC`,
         serviceIds,
@@ -113,6 +113,8 @@ export class PublicService {
           price: s.price,
           duration: s.duration,
           coverImageUrl: s.cover_image_url,
+          techCount: s.tech_count || 1,
+          isMultiTech: s.is_multi_tech === 1,
           addons: addonsByService[s.id] || [],
         })),
     }));
@@ -121,17 +123,22 @@ export class PublicService {
   /**
    * Get active staff for a salon
    */
-  async getStaffBySalon(salonId: string) {
-    const staff = await this.db.all(
-      'SELECT * FROM staff WHERE salon_id = ? AND is_active = 1 AND role != ? ORDER BY sort_order ASC',
-      [salonId, 'OWNER'],
-    );
+  async getStaffBySalon(salonId: string, gender?: string) {
+    let query = 'SELECT * FROM staff WHERE salon_id = ? AND is_active = 1 AND role != ? ORDER BY sort_order ASC';
+    let params: any[] = [salonId, 'OWNER'];
+
+    if (gender) {
+      query = 'SELECT * FROM staff WHERE salon_id = ? AND is_active = 1 AND role != ? AND gender = ? ORDER BY sort_order ASC';
+      params = [salonId, 'OWNER', gender];
+    }
+
+    const staff = await this.db.all(query, params);
 
     // Get staff-service mappings
     const staffIds = staff.map((s) => s.id);
     let staffServices: any[] = [];
     if (staffIds.length > 0) {
-      const placeholders = staffIds.map((_, i) => `$${i + 1}`).join(',');
+      const placeholders = staffIds.map(() => '?').join(',');
       staffServices = await this.db.all(
         `SELECT ss.staff_id, ss.service_id FROM staff_services ss WHERE ss.staff_id IN (${placeholders})`,
         staffIds,
@@ -166,6 +173,8 @@ export class PublicService {
     date: string,
     serviceId: string,
     staffId?: string,
+    gender?: string,
+    totalDuration?: number,
   ) {
     // Validate date format
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -181,7 +190,7 @@ export class PublicService {
       throw new NotFoundException('Service not found');
     }
 
-    const duration = service.duration; // in minutes
+    const duration = totalDuration || service.duration; // in minutes
 
     // Get booking settings
     const bookingSettings = await this.db.get(
@@ -245,12 +254,19 @@ export class PublicService {
       eligibleStaff = [staff];
     } else {
       // Get all staff that provide this service
-      const staffWithService = await this.db.all(
-        `SELECT s.* FROM staff s
+      let query = `SELECT s.* FROM staff s
          JOIN staff_services ss ON s.id = ss.staff_id
-         WHERE ss.service_id = ? AND s.salon_id = ? AND s.is_active = 1`,
-        [serviceId, salonId],
-      );
+         WHERE ss.service_id = ? AND s.salon_id = ? AND s.is_active = 1`;
+      let queryParams: any[] = [serviceId, salonId];
+
+      if (gender) {
+        query = `SELECT s.* FROM staff s
+         JOIN staff_services ss ON s.id = ss.staff_id
+         WHERE ss.service_id = ? AND s.salon_id = ? AND s.is_active = 1 AND s.gender = ?`;
+        queryParams = [serviceId, salonId, gender];
+      }
+
+      const staffWithService = await this.db.all(query, queryParams);
       eligibleStaff = staffWithService;
     }
 
@@ -527,7 +543,7 @@ export class PublicService {
       { label: 'Gallery', href: '#gallery', enabled: true },
       { label: 'Contact', href: '#contact', enabled: true },
     ]};
-    const defaultHero = { enabled: true, type: 'image', title: 'Welcome to Our Salon', subtitle: 'Your beauty is our passion', backgroundImage: '', ctaText: 'Book Now', ctaLink: '/booking' };
+    const defaultHero = { enabled: true, type: 'image', title: 'Welcome to Our Salon', subtitle: 'Your beauty is our passion', backgroundImage: '', ctaText: 'Book Now', ctaLink: '/book' };
     const defaultSections = [
       { id: 'services', type: 'services', enabled: true, title: 'Our Services', subtitle: 'What we offer', order: 0 },
       { id: 'about', type: 'about', enabled: true, title: 'About Us', subtitle: '', content: '', image: '', order: 1 },

@@ -44,6 +44,8 @@ export interface Service {
   price: number
   duration: number
   coverImageUrl: string | null
+  techCount: number
+  isMultiTech: boolean
   addons: ServiceAddon[]
 }
 

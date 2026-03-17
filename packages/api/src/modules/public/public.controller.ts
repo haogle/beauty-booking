@@ -38,14 +38,17 @@ export class PublicController {
    * GET /api/v1/public/salon/:subdomain/staff
    */
   @Get('salon/:subdomain/staff')
-  async getStaff(@Param('subdomain') subdomain: string) {
+  async getStaff(
+    @Param('subdomain') subdomain: string,
+    @Query('gender') gender?: string,
+  ) {
     const salon = await this.publicService.getSalonBySubdomain(subdomain);
-    return this.publicService.getStaffBySalon(salon.id);
+    return this.publicService.getStaffBySalon(salon.id, gender);
   }
 
   /**
    * Get available time slots
-   * GET /api/v1/public/salon/:subdomain/availability?date=YYYY-MM-DD&serviceId=xxx&staffId=xxx
+   * GET /api/v1/public/salon/:subdomain/availability?date=YYYY-MM-DD&serviceId=xxx&staffId=xxx&gender=xxx&totalDuration=xxx
    */
   @Get('salon/:subdomain/availability')
   async getAvailability(
@@ -53,12 +56,17 @@ export class PublicController {
     @Query('date') date: string,
     @Query('serviceId') serviceId: string,
     @Query('staffId') staffId?: string,
+    @Query('gender') gender?: string,
+    @Query('totalDuration') totalDuration?: string,
   ) {
     if (!date || !serviceId) {
       throw new BadRequestException('date and serviceId are required');
     }
     const salon = await this.publicService.getSalonBySubdomain(subdomain);
-    return this.publicService.getAvailability(salon.id, date, serviceId, staffId);
+    return this.publicService.getAvailability(
+      salon.id, date, serviceId, staffId, gender,
+      totalDuration ? parseInt(totalDuration, 10) : undefined,
+    );
   }
 
   /**
