@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import api from '../lib/api'
+import { ImageUploader } from './ImageUploader'
 
 // ============ TYPES ============
 
@@ -727,19 +728,14 @@ const ServicesManager: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Cover Image URL</label>
-            <input
-              type="url"
+            <label className="block text-sm font-medium text-gray-700 mb-2">Cover Image</label>
+            <ImageUploader
               value={serviceForm.coverImageUrl}
-              onChange={(e) => setServiceForm({ ...serviceForm, coverImageUrl: e.target.value })}
-              placeholder="https://example.com/image.jpg"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              onChange={(url) => setServiceForm({ ...serviceForm, coverImageUrl: url })}
+              shape="landscape"
+              placeholder="Upload service cover image"
+              maxWidth={800}
             />
-            {serviceForm.coverImageUrl && (
-              <div className="mt-2 rounded-lg overflow-hidden border border-gray-200 h-32 bg-gray-50">
-                <img src={serviceForm.coverImageUrl} alt="Preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-              </div>
-            )}
           </div>
         </div>
 

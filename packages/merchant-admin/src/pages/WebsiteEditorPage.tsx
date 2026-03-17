@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../lib/api'
 import ServicesManager from '../components/ServicesManager'
+import { ImageUploader, MultiImageUploader } from '../components/ImageUploader'
 
 // ============ TYPES ============
 
@@ -507,36 +508,17 @@ const HeroEditor: React.FC<{
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Background Image</label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={hero.backgroundImage}
-            onChange={(e) =>
-              updateConfig((prev) => ({
-                ...prev,
-                hero: { ...prev.hero, backgroundImage: e.target.value },
-              }))
-            }
-            placeholder="Enter image URL or pick from media library"
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
-          <button
-            onClick={() =>
-              openMediaPicker((url) =>
-                updateConfig((prev) => ({ ...prev, hero: { ...prev.hero, backgroundImage: url } }))
-              )
-            }
-            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
-          >
-            Browse
-          </button>
-        </div>
-        {hero.backgroundImage && (
-          <div className="mt-2 rounded-lg overflow-hidden border border-gray-200">
-            <img src={hero.backgroundImage} alt="Hero background" className="w-full h-32 object-cover" />
-          </div>
-        )}
+        <label className="block text-sm font-medium text-gray-700 mb-2">Background Image</label>
+        <ImageUploader
+          value={hero.backgroundImage}
+          onChange={(url) =>
+            updateConfig((prev) => ({ ...prev, hero: { ...prev.hero, backgroundImage: url } }))
+          }
+          shape="banner"
+          placeholder="Upload hero background image"
+          maxWidth={1600}
+          quality={0.85}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -713,60 +695,27 @@ const SectionsEditor: React.FC<{
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Image</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={section.image || ''}
-                          onChange={(e) => updateSection(section.id, { image: e.target.value })}
-                          placeholder="Image URL"
-                          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        />
-                        <button
-                          onClick={() =>
-                            openMediaPicker((url) => updateSection(section.id, { image: url }))
-                          }
-                          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
-                        >
-                          Browse
-                        </button>
-                      </div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Image</label>
+                      <ImageUploader
+                        value={section.image || ''}
+                        onChange={(url) => updateSection(section.id, { image: url })}
+                        shape="landscape"
+                        placeholder="Upload section image"
+                      />
                     </div>
                   </>
                 )}
 
                 {section.type === 'gallery' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Gallery Images ({(section.images || []).length})
                     </label>
-                    <div className="grid grid-cols-3 gap-2 mb-2">
-                      {(section.images || []).map((img, i) => (
-                        <div key={i} className="relative group">
-                          <img src={img} alt={`Gallery ${i}`} className="w-full h-20 object-cover rounded-lg border border-gray-200" />
-                          <button
-                            onClick={() => {
-                              const newImages = [...(section.images || [])]
-                              newImages.splice(i, 1)
-                              updateSection(section.id, { images: newImages })
-                            }}
-                            className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                          >
-                            x
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() =>
-                        openMediaPicker((url) =>
-                          updateSection(section.id, { images: [...(section.images || []), url] })
-                        )
-                      }
-                      className="px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm font-medium transition-colors"
-                    >
-                      + Add Image
-                    </button>
+                    <MultiImageUploader
+                      value={section.images || []}
+                      onChange={(urls) => updateSection(section.id, { images: urls })}
+                      maxImages={12}
+                    />
                   </div>
                 )}
 
@@ -803,31 +752,17 @@ const NavbarEditor: React.FC<{
       <h2 className="text-xl font-bold text-gray-900">Navigation Bar</h2>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Logo</label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={navbar.logo}
-            onChange={(e) =>
-              updateConfig((prev) => ({ ...prev, navbar: { ...prev.navbar, logo: e.target.value } }))
-            }
-            placeholder="Logo image URL"
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
-          <button
-            onClick={() =>
-              openMediaPicker((url) =>
-                updateConfig((prev) => ({ ...prev, navbar: { ...prev.navbar, logo: url } }))
-              )
-            }
-            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
-          >
-            Browse
-          </button>
-        </div>
-        {navbar.logo && (
-          <img src={navbar.logo} alt="Logo" className="mt-2 h-10 object-contain" />
-        )}
+        <label className="block text-sm font-medium text-gray-700 mb-2">Logo</label>
+        <ImageUploader
+          value={navbar.logo}
+          onChange={(url) =>
+            updateConfig((prev) => ({ ...prev, navbar: { ...prev.navbar, logo: url } }))
+          }
+          shape="square"
+          placeholder="Upload logo"
+          maxWidth={400}
+          quality={0.9}
+        />
       </div>
 
       <div>
@@ -1007,34 +942,19 @@ const ServicePageEditor: React.FC<{
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Cover Image</label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={sp.coverImage}
-            onChange={(e) =>
-              updateConfig((prev) => ({
-                ...prev,
-                servicePage: { ...prev.servicePage, coverImage: e.target.value },
-              }))
-            }
-            placeholder="Service page cover image URL"
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
-          <button
-            onClick={() =>
-              openMediaPicker((url) =>
-                updateConfig((prev) => ({
-                  ...prev,
-                  servicePage: { ...prev.servicePage, coverImage: url },
-                }))
-              )
-            }
-            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
-          >
-            Browse
-          </button>
-        </div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Cover Image</label>
+        <ImageUploader
+          value={sp.coverImage}
+          onChange={(url) =>
+            updateConfig((prev) => ({
+              ...prev,
+              servicePage: { ...prev.servicePage, coverImage: url },
+            }))
+          }
+          shape="banner"
+          placeholder="Upload service page cover"
+          maxWidth={1200}
+        />
       </div>
 
       <div className="space-y-3">
@@ -1263,28 +1183,16 @@ const SeoEditor: React.FC<{
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Social Share Image (OG Image)</label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={seo.ogImage}
-            onChange={(e) =>
-              updateConfig((prev) => ({ ...prev, seo: { ...prev.seo, ogImage: e.target.value } }))
-            }
-            placeholder="Image URL for social media sharing"
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
-          <button
-            onClick={() =>
-              openMediaPicker((url) =>
-                updateConfig((prev) => ({ ...prev, seo: { ...prev.seo, ogImage: url } }))
-              )
-            }
-            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
-          >
-            Browse
-          </button>
-        </div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Social Share Image (OG Image)</label>
+        <ImageUploader
+          value={seo.ogImage}
+          onChange={(url) =>
+            updateConfig((prev) => ({ ...prev, seo: { ...prev.seo, ogImage: url } }))
+          }
+          shape="landscape"
+          placeholder="Upload social share image"
+          maxWidth={1200}
+        />
       </div>
 
       {/* SEO Preview */}
@@ -1309,48 +1217,24 @@ const MediaLibrary: React.FC<{
   onAdd: (url: string, filename: string) => void
   onDelete: (id: string) => void
 }> = ({ files, onAdd, onDelete }) => {
-  const [newUrl, setNewUrl] = useState('')
-  const [newFilename, setNewFilename] = useState('')
-
-  const handleAdd = () => {
-    if (!newUrl) return
-    const filename = newFilename || newUrl.split('/').pop() || 'image.jpg'
-    onAdd(newUrl, filename)
-    setNewUrl('')
-    setNewFilename('')
+  const handleUploadComplete = (url: string) => {
+    const filename = `upload_${Date.now()}.jpg`
+    onAdd(url, filename)
   }
 
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-gray-900">Media Library</h2>
 
-      {/* Add by URL */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
-        <p className="text-sm font-medium text-gray-700">Add Image by URL</p>
-        <input
-          type="text"
-          value={newUrl}
-          onChange={(e) => setNewUrl(e.target.value)}
-          placeholder="https://example.com/image.jpg"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-        />
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newFilename}
-            onChange={(e) => setNewFilename(e.target.value)}
-            placeholder="Optional filename"
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
-          <button
-            onClick={handleAdd}
-            disabled={!newUrl}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
-          >
-            Add
-          </button>
-        </div>
-      </div>
+      {/* Upload Area */}
+      <ImageUploader
+        value=""
+        onChange={handleUploadComplete}
+        shape="banner"
+        placeholder="Click or drag images here to upload"
+        removable={false}
+        maxWidth={1200}
+      />
 
       {/* Media Grid */}
       {files.length === 0 ? (
@@ -1396,15 +1280,7 @@ const MediaPickerModal: React.FC<{
   onSelect: (url: string) => void
   onClose: () => void
   onAdd: (url: string, filename: string) => void
-}> = ({ files, onSelect, onClose, onAdd }) => {
-  const [newUrl, setNewUrl] = useState('')
-
-  const handleAddAndSelect = () => {
-    if (!newUrl) return
-    onAdd(newUrl, newUrl.split('/').pop() || 'image.jpg')
-    onSelect(newUrl)
-  }
-
+}> = ({ files, onSelect, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-2xl w-[640px] max-h-[80vh] flex flex-col">
@@ -1413,24 +1289,15 @@ const MediaPickerModal: React.FC<{
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl">&times;</button>
         </div>
 
-        {/* Add by URL */}
+        {/* Upload new image */}
         <div className="p-4 border-b border-gray-100">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newUrl}
-              onChange={(e) => setNewUrl(e.target.value)}
-              placeholder="Paste image URL and press Add"
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            />
-            <button
-              onClick={handleAddAndSelect}
-              disabled={!newUrl}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
-            >
-              Add & Select
-            </button>
-          </div>
+          <ImageUploader
+            value=""
+            onChange={(url) => onSelect(url)}
+            shape="banner"
+            placeholder="Upload a new image"
+            removable={false}
+          />
         </div>
 
         {/* Grid */}
