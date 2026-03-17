@@ -40,6 +40,12 @@ interface StaffMember {
 // ============ VIEWS ============
 type ViewMode = 'list' | 'detail' | 'edit'
 
+// Helper: normalize isActive (API returns boolean, but guard against numeric 0/1)
+const isServiceActive = (service: SvcService): boolean => {
+  if (service.isActive === undefined || service.isActive === null) return true // default active
+  return service.isActive === true || (service.isActive as any) === 1
+}
+
 // ============ COMPONENT ============
 
 const ServicesManager: React.FC = () => {
@@ -203,7 +209,7 @@ const ServicesManager: React.FC = () => {
 
   const handleToggleService = async (service: SvcService) => {
     if (!service.id) return
-    const newActive = !service.isActive
+    const newActive = !isServiceActive(service)
     try {
       await api.put(`/api/v1/merchant/salon/services/${service.id}`, { isActive: newActive })
       showSuccess(newActive ? 'Service enabled' : 'Service paused')
@@ -389,7 +395,7 @@ const ServicesManager: React.FC = () => {
                 <div
                   key={service.id}
                   className={`bg-white rounded-xl border border-gray-200 overflow-hidden cursor-pointer group hover:shadow-lg hover:border-purple-200 transition-all duration-200 ${
-                    service.isActive === false ? 'opacity-70' : ''
+                    !isServiceActive(service) ? 'opacity-70' : ''
                   }`}
                   onClick={() => openServiceDetail(service)}
                 >
@@ -407,7 +413,7 @@ const ServicesManager: React.FC = () => {
                       </div>
                     )}
                     {/* Paused Badge */}
-                    {service.isActive === false && (
+                    {!isServiceActive(service) && (
                       <div className="absolute top-3 left-3 bg-orange-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
                         Paused
                       </div>
@@ -506,7 +512,7 @@ const ServicesManager: React.FC = () => {
                   <span className="text-6xl opacity-30">💆</span>
                 </div>
               )}
-              {selectedService.isActive === false && (
+              {!isServiceActive(selectedService) && (
                 <div className="absolute top-4 left-4 bg-orange-500 text-white text-sm font-bold px-3 py-1.5 rounded-full">
                   Paused
                 </div>
@@ -561,7 +567,7 @@ const ServicesManager: React.FC = () => {
               {selectedService.addons && selectedService.addons.length > 0 ? (
                 <div className="space-y-3">
                   {selectedService.addons.map((addon, index) => (
-                    <div key={addon.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
+                    <div key={addon.id || `addon-${index}`} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
                       <div className="flex items-center gap-3">
                         <span className="w-6 h-6 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-xs font-bold">
                           {index + 1}
@@ -589,11 +595,11 @@ const ServicesManager: React.FC = () => {
               <h3 className="text-sm font-bold text-gray-800 mb-3">Service Status</h3>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-sm font-semibold ${selectedService.isActive !== false ? 'text-green-600' : 'text-orange-500'}`}>
-                    {selectedService.isActive !== false ? 'Active' : 'Paused'}
+                  <p className={`text-sm font-semibold ${isServiceActive(selectedService) ? 'text-green-600' : 'text-orange-500'}`}>
+                    {isServiceActive(selectedService) ? 'Active' : 'Paused'}
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {selectedService.isActive !== false
+                    {isServiceActive(selectedService)
                       ? 'Visible to customers'
                       : 'Hidden from booking page'}
                   </p>
@@ -601,12 +607,12 @@ const ServicesManager: React.FC = () => {
                 <button
                   onClick={() => handleToggleService(selectedService)}
                   className={`relative w-12 h-6 rounded-full transition-colors ${
-                    selectedService.isActive !== false ? 'bg-green-500' : 'bg-gray-300'
+                    isServiceActive(selectedService) ? 'bg-green-500' : 'bg-gray-300'
                   }`}
                 >
                   <span
                     className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                      selectedService.isActive !== false ? 'left-6' : 'left-0.5'
+                      isServiceActive(selectedService) ? 'left-6' : 'left-0.5'
                     }`}
                   />
                 </button>
@@ -621,7 +627,7 @@ const ServicesManager: React.FC = () => {
                   {staff.filter(s => s.isActive).map((member) => (
                     <div key={member.id} className="flex items-center gap-3 py-2">
                       <div className="w-8 h-8 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-xs font-bold">
-                        {member.firstName[0]}{member.lastName[0]}
+                        {(member.firstName || '?')[0]}{(member.lastName || '?')[0]}
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-700">{member.firstName} {member.lastName}</p>
