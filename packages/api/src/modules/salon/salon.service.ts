@@ -1148,18 +1148,28 @@ export class SalonService {
       }
 
       // Get primary service name and staff name from first appointment_service
-      let serviceName = 'Unknown';
-      let staffName = 'Unknown';
+      let serviceName = 'Walk-in';
+      let staffName = 'Unassigned';
+      let staffId = '';
+      let serviceId = '';
       let duration = apt.total_duration || 0;
       if (aptServices.length > 0) {
         const firstSvc = aptServices[0];
         if (firstSvc.service_id) {
+          serviceId = firstSvc.service_id;
           const svc = await this.db.get('SELECT name FROM services WHERE id = ?', [firstSvc.service_id]);
           if (svc) serviceName = svc.name;
         }
         if (firstSvc.staff_id) {
+          staffId = firstSvc.staff_id;
           const staff = await this.db.get('SELECT name FROM staff WHERE id = ?', [firstSvc.staff_id]);
-          if (staff) staffName = staff.name || 'Unknown';
+          if (staff) staffName = staff.name || 'Unassigned';
+        }
+      } else {
+        // Fallback: try to recover service/staff info from appointment context
+        // Check if appointment_services were lost — show price-based label
+        if (apt.total_price > 0) {
+          serviceName = `Service ($${Number(apt.total_price).toFixed(0)})`;
         }
       }
 
@@ -1168,7 +1178,10 @@ export class SalonService {
         clientName,
         serviceName,
         staffName,
+        staffId,
+        serviceId,
         duration,
+        price: apt.total_price || 0,
         time: apt.start_time,
         services: aptServices.map(s => this.normalizeAppointmentService(s)),
       });

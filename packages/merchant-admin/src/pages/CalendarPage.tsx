@@ -169,10 +169,20 @@ export const CalendarPage: React.FC = () => {
     try {
       const response = await api.get('/api/v1/merchant/salon/services')
       const result = response.data?.data || response.data
-      const svcList = Array.isArray(result)
-        ? result
-        : result.services || []
-      setServices(svcList)
+      // API returns categories with nested services — flatten them
+      const categories = Array.isArray(result) ? result : result.services || []
+      const flat: Service[] = []
+      for (const cat of categories) {
+        if (cat.services && Array.isArray(cat.services)) {
+          for (const svc of cat.services) {
+            flat.push({ ...svc, categoryName: cat.name || cat.categoryName })
+          }
+        } else if (cat.id && cat.name && cat.price !== undefined) {
+          // Already a flat service
+          flat.push(cat)
+        }
+      }
+      setServices(flat)
     } catch {
       // silently ignore service fetch errors
     }
