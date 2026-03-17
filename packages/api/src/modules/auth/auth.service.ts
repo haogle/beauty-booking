@@ -198,7 +198,7 @@ export class AuthService {
   private generateAccessToken(payload: any): string {
     return this.jwtService.sign(payload, {
       secret: process.env.JWT_SECRET || 'beauty-booking-dev-secret-key-2026',
-      expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any,
+      expiresIn: (process.env.JWT_EXPIRES_IN || '24h') as any,
     });
   }
 

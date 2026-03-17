@@ -516,15 +516,44 @@ export const CalendarPage: React.FC = () => {
     }
   }
 
+  const refetchAndSelect = async (apptId: string) => {
+    // Build date range based on current view mode
+    let startDate: string
+    let endDate: string
+    if (viewMode === 'week') {
+      const monday = getMonday(currentDate)
+      const sunday = new Date(monday)
+      sunday.setDate(sunday.getDate() + 6)
+      startDate = formatDate(monday)
+      endDate = formatDate(sunday)
+    } else if (viewMode === 'day') {
+      startDate = formatDate(currentDate)
+      endDate = formatDate(currentDate)
+    } else {
+      const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+      const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
+      startDate = formatDate(firstDay)
+      endDate = formatDate(lastDay)
+    }
+    let url = `/api/v1/merchant/salon/appointments?startDate=${startDate}&endDate=${endDate}&limit=1000`
+    if (selectedStaffId !== 'all') {
+      url += `&staffId=${selectedStaffId}`
+    }
+    const response = await api.get(url)
+    const result = response.data?.data || response.data
+    const freshAppointments = result.appointments || (Array.isArray(result) ? result : [])
+    setAppointments(freshAppointments)
+    const updated = freshAppointments.find((a: Appointment) => a.id === apptId)
+    if (updated) {
+      setSelectedAppt(updated)
+    }
+  }
+
   const updateAppointmentStatus = async (apptId: string, status: string) => {
     try {
       const endpoint = status.toLowerCase().replace('_', '-')
       await api.patch(`/api/v1/merchant/salon/appointments/${apptId}/${endpoint}`)
-      await fetchAppointments()
-      const updated = appointments.find((a) => a.id === apptId)
-      if (updated) {
-        setSelectedAppt(updated)
-      }
+      await refetchAndSelect(apptId)
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message)
@@ -577,11 +606,7 @@ export const CalendarPage: React.FC = () => {
         tip: tipAmount,
       })
       setTipAmount(0)
-      await fetchAppointments()
-      const updated = appointments.find((a) => a.id === selectedAppt.id)
-      if (updated) {
-        setSelectedAppt(updated)
-      }
+      await refetchAndSelect(selectedAppt.id)
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message)

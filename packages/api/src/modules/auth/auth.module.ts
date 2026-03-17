@@ -13,7 +13,7 @@ import { AuthController } from './auth.controller';
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'beauty-booking-dev-secret-key-2026',
       signOptions: {
-        expiresIn: '15m',
+        expiresIn: '24h',
       },
     }),
   ],
