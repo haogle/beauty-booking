@@ -44,14 +44,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/services"
-            element={
-              <ProtectedRoute>
-                <ServicesPage />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/services" element={<Navigate to="/website-editor" replace />} />
           <Route
             path="/customers"
             element={

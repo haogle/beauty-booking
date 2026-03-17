@@ -21,9 +21,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/calendar', label: 'Calendar' },
     { path: '/customers', label: 'Customers' },
     { path: '/gift-cards', label: 'Gift Cards' },
-    { path: '/services', label: 'Services' },
     { path: '/staff', label: 'Staff' },
-    { path: '/website-editor', label: 'Website Editor' },
+    { path: '/website-editor', label: 'Store' },
     // Settings section
     { path: '/salon-settings', label: 'Salon Settings' },
     { path: '/business-hours', label: 'Business Hours' },
