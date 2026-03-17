@@ -980,6 +980,155 @@ export class PlatformService {
     };
   }
 
+  // ============================================================================
+  // SALON SERVICES, STAFF, BOOKINGS
+  // ============================================================================
+
+  async getSalonServices(salonId: string): Promise<any[]> {
+    const salon = await this.db.get('SELECT id FROM salons WHERE id = ?', [salonId]);
+    if (!salon) throw new NotFoundException(`Salon ${salonId} not found`);
+
+    const services = await this.db.all<any>(
+      `SELECT s.id, s.salon_id, s.name, s.description, s.duration, s.price,
+              s.is_active, s.sort_order, s.created_at, s.updated_at,
+              sc.name as category_name
+       FROM services s
+       LEFT JOIN service_categories sc ON s.category_id = sc.id
+       WHERE s.salon_id = ?
+       ORDER BY s.sort_order ASC, s.name ASC`,
+      [salonId],
+    );
+
+    return services.map(s => ({
+      id: s.id,
+      salonId: s.salon_id,
+      name: s.name,
+      description: s.description,
+      duration: s.duration,
+      price: s.price,
+      isActive: s.is_active === 1,
+      sortOrder: s.sort_order,
+      categoryName: s.category_name,
+      createdAt: s.created_at,
+      updatedAt: s.updated_at,
+    }));
+  }
+
+  async getSalonStaff(salonId: string): Promise<any[]> {
+    const salon = await this.db.get('SELECT id FROM salons WHERE id = ?', [salonId]);
+    if (!salon) throw new NotFoundException(`Salon ${salonId} not found`);
+
+    const staff = await this.db.all<any>(
+      `SELECT id, salon_id, account_id, name, email, phone, role, avatar_url,
+              bio, is_active, sort_order, created_at, updated_at
+       FROM staff
+       WHERE salon_id = ?
+       ORDER BY sort_order ASC, name ASC`,
+      [salonId],
+    );
+
+    return staff.map(s => ({
+      id: s.id,
+      salonId: s.salon_id,
+      accountId: s.account_id,
+      name: s.name,
+      email: s.email,
+      phone: s.phone,
+      role: s.role,
+      avatarUrl: s.avatar_url,
+      bio: s.bio,
+      isActive: s.is_active === 1,
+      sortOrder: s.sort_order,
+      createdAt: s.created_at,
+      updatedAt: s.updated_at,
+    }));
+  }
+
+  async getSalonBookings(salonId: string, page: number = 1, pageSize: number = 20): Promise<PaginatedResponse<any>> {
+    const salon = await this.db.get('SELECT id FROM salons WHERE id = ?', [salonId]);
+    if (!salon) throw new NotFoundException(`Salon ${salonId} not found`);
+
+    const skip = (page - 1) * pageSize;
+
+    const countResult = await this.db.get<{ count: number }>(
+      'SELECT COUNT(*) as count FROM appointments WHERE salon_id = ?',
+      [salonId],
+    );
+    const total = countResult?.count || 0;
+
+    const bookings = await this.db.all<any>(
+      `SELECT a.id, a.salon_id, a.date, a.start_time, a.end_time, a.status,
+              a.total_price, a.notes, a.created_at,
+              a.customer_name, a.customer_email, a.customer_phone,
+              st.name as staff_name,
+              s.name as service_name
+       FROM appointments a
+       LEFT JOIN staff st ON a.staff_id = st.id
+       LEFT JOIN services s ON a.service_id = s.id
+       WHERE a.salon_id = ?
+       ORDER BY a.date DESC, a.start_time DESC
+       LIMIT ? OFFSET ?`,
+      [salonId, pageSize, skip],
+    );
+
+    return {
+      data: bookings.map(b => ({
+        id: b.id,
+        salonId: b.salon_id,
+        date: b.date,
+        startTime: b.start_time,
+        endTime: b.end_time,
+        status: b.status,
+        totalPrice: b.total_price,
+        notes: b.notes,
+        customerName: b.customer_name,
+        customerEmail: b.customer_email,
+        customerPhone: b.customer_phone,
+        staffName: b.staff_name,
+        serviceName: b.service_name,
+        createdAt: b.created_at,
+      })),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
+  async getCustomerAccounts(customerId: string): Promise<any[]> {
+    const customer = await this.db.get('SELECT id FROM customers WHERE id = ?', [customerId]);
+    if (!customer) throw new NotFoundException(`Customer ${customerId} not found`);
+
+    const accounts = await this.db.all<any>(
+      `SELECT a.id, a.username, a.platform_name, a.status, a.uuid,
+              a.last_login_at, a.notes, a.created_at, a.updated_at
+       FROM accounts a
+       WHERE a.customer_id = ?
+       ORDER BY a.created_at DESC`,
+      [customerId],
+    );
+
+    const result = [];
+    for (const account of accounts) {
+      const salonCount = await this.db.get<{ count: number }>(
+        'SELECT COUNT(*) as count FROM salons WHERE account_id = ?',
+        [account.id],
+      );
+      result.push({
+        id: account.id,
+        username: account.username,
+        platformName: account.platform_name,
+        status: account.status,
+        uuid: account.uuid,
+        lastLoginAt: account.last_login_at,
+        notes: account.notes,
+        createdAt: account.created_at,
+        updatedAt: account.updated_at,
+        salonCount: salonCount?.count || 0,
+      });
+    }
+    return result;
+  }
+
   async updateSalon(id: string, data: any): Promise<any> {
     const salon = await this.db.get('SELECT * FROM salons WHERE id = ?', [id]);
     if (!salon) {

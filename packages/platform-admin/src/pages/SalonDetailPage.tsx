@@ -70,7 +70,7 @@ export default function SalonDetailPage() {
       setError(null);
 
       const response = await api.get(`/api/v1/platform/salons/${id}`);
-      const salonData = response.data;
+      const salonData = response.data?.data || response.data;
 
       setSalon(salonData);
       setEditData(salonData);
@@ -121,7 +121,7 @@ export default function SalonDetailPage() {
       };
 
       const response = await api.put(`/api/v1/platform/salons/${id}`, updatePayload);
-      const updatedSalon = response.data;
+      const updatedSalon = response.data?.data || response.data;
 
       setSalon(updatedSalon);
       setEditData(updatedSalon);

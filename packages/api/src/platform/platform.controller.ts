@@ -162,4 +162,32 @@ export class PlatformController {
   async getSalon(@Param('id') id: string) {
     return this.platformService.getSalon(id);
   }
+
+  @Get('salons/:id/services')
+  async getSalonServices(@Param('id') id: string) {
+    return this.platformService.getSalonServices(id);
+  }
+
+  @Get('salons/:id/staff')
+  async getSalonStaff(@Param('id') id: string) {
+    return this.platformService.getSalonStaff(id);
+  }
+
+  @Get('salons/:id/bookings')
+  async getSalonBookings(
+    @Param('id') id: string,
+    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+    @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize?: number,
+  ) {
+    return this.platformService.getSalonBookings(id, page || 1, pageSize || 20);
+  }
+
+  // ============================================================================
+  // CUSTOMER ACCOUNTS
+  // ============================================================================
+
+  @Get('customers/:id/accounts')
+  async getCustomerAccounts(@Param('id') id: string) {
+    return this.platformService.getCustomerAccounts(id);
+  }
 }
