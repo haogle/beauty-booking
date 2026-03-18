@@ -203,7 +203,16 @@ export default function SalonDetailPage() {
     try {
       const response = await api.get(`/api/v1/platform/salons/${id}/service-categories`);
       const data = response.data?.data || response.data;
-      setServiceCategories(Array.isArray(data) ? data : []);
+      const cats = Array.isArray(data) ? data : [];
+      setServiceCategories(cats);
+      // Extract services from nested categories to populate the flat services list
+      const allServices: Service[] = [];
+      cats.forEach((cat: any) => {
+        if (cat.services && Array.isArray(cat.services)) {
+          cat.services.forEach((s: any) => allServices.push({ ...s, categoryId: cat.id }));
+        }
+      });
+      if (allServices.length > 0) setServices(allServices);
     } catch (err) {
       console.error('Failed to load service categories:', err);
     }
