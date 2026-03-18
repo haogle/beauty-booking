@@ -145,9 +145,13 @@ export const CalendarPage: React.FC = () => {
   const [clientSearch, setClientSearch] = useState('')
   const [showClientDropdown, setShowClientDropdown] = useState(false)
 
+  // Business hours state
+  const [businessHours, setBusinessHours] = useState<Record<number, { openTime: string; closeTime: string; isClosed: boolean }>>({})
+
   useEffect(() => {
     fetchStaff()
     fetchServices()
+    fetchBusinessHours()
   }, [])
 
   useEffect(() => {
@@ -163,6 +167,49 @@ export const CalendarPage: React.FC = () => {
     } catch {
       // silently ignore staff fetch errors
     }
+  }
+
+  const fetchBusinessHours = async () => {
+    try {
+      const response = await api.get('/api/v1/merchant/salon/business-hours')
+      const result = response.data?.data || response.data
+      const hours = Array.isArray(result) ? result : []
+      const hoursMap: Record<number, { openTime: string; closeTime: string; isClosed: boolean }> = {}
+      hours.forEach((h: any) => {
+        hoursMap[h.dayOfWeek] = {
+          openTime: h.openTime || '09:00',
+          closeTime: h.closeTime || '18:00',
+          isClosed: h.isClosed === true || h.isClosed === 1,
+        }
+      })
+      setBusinessHours(hoursMap)
+    } catch {
+      // fallback: no business hours data
+    }
+  }
+
+  const isNonBusinessHour = (date: Date, timeSlot: string): boolean => {
+    const dayOfWeek = date.getDay() === 0 ? 6 : date.getDay() - 1 // Mon=0 ... Sun=6
+    const hours = businessHours[dayOfWeek]
+    if (!hours) return false
+    if (hours.isClosed) return true
+    return timeSlot < hours.openTime || timeSlot >= hours.closeTime
+  }
+
+  const getAvatarColor = (name: string) => {
+    const colors = ['#7C5CFC', '#F5A623', '#4ECDC4', '#FF6B6B', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#FF9FF3']
+    return colors[name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % colors.length]
+  }
+
+  const getStaffInitials = (staff: StaffMember) => {
+    const first = (staff.firstName || staff.name?.split(' ')[0] || '?')[0]
+    const last = (staff.lastName || staff.name?.split(' ')[1] || '?')[0]
+    return `${first}${last}`.toUpperCase()
+  }
+
+  const getDayAppointmentCount = (date: Date): number => {
+    const dateStr = formatDate(date)
+    return appointments.filter(a => a.date === dateStr && a.status !== 'CANCELLED').length
   }
 
   const fetchServices = async () => {
@@ -741,21 +788,34 @@ export const CalendarPage: React.FC = () => {
               {getDateRangeLabel()}
             </h2>
 
-            {/* Staff Filter */}
+            {/* Staff Avatar Filter */}
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-600">Staff:</label>
-              <select
-                value={selectedStaffId}
-                onChange={(e) => setSelectedStaffId(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <button
+                onClick={() => setSelectedStaffId('all')}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                  selectedStaffId === 'all'
+                    ? 'ring-2 ring-blue-500 ring-offset-2 bg-pink-100'
+                    : 'bg-gray-100 hover:bg-gray-200'
+                }`}
+                title="All Staff"
               >
-                <option value="all">All Staff</option>
-                {staffList.map((staff) => (
-                  <option key={staff.id} value={staff.id}>
-                    {staff.name || `${staff.firstName} ${staff.lastName}`}
-                  </option>
-                ))}
-              </select>
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              </button>
+              {staffList.map((staff) => (
+                <button
+                  key={staff.id}
+                  onClick={() => setSelectedStaffId(staff.id)}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold transition-all ${
+                    selectedStaffId === staff.id ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : 'hover:scale-105'
+                  }`}
+                  style={{ backgroundColor: getAvatarColor(staff.name || `${staff.firstName} ${staff.lastName}`) }}
+                  title={staff.name || `${staff.firstName} ${staff.lastName}`}
+                >
+                  {getStaffInitials(staff)}
+                </button>
+              ))}
             </div>
 
             {/* New Appointment Button */}
@@ -809,6 +869,21 @@ export const CalendarPage: React.FC = () => {
                   })}
                 </div>
 
+                {/* Booking Summary Row */}
+                <div className="flex border-b border-gray-200">
+                  <div className="w-20 bg-gray-100 border-r border-gray-200" />
+                  {(viewMode === 'week' ? getWeekDates() : [currentDate]).map((date, i) => {
+                    const count = getDayAppointmentCount(date)
+                    return (
+                      <div key={`summary-${i}`} className={`flex-1 border-r border-gray-200 py-1.5 text-center text-xs font-medium min-w-56 ${
+                        count > 0 ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-400'
+                      }`}>
+                        {count > 0 ? `${count} booking${count > 1 ? 's' : ''}` : 'No bookings'}
+                      </div>
+                    )
+                  })}
+                </div>
+
                 {/* Time Slots */}
                 {TIME_SLOTS.map((time, idx) => (
                   <div key={time} className="flex border-b border-gray-200 h-16">
@@ -817,13 +892,21 @@ export const CalendarPage: React.FC = () => {
                     </div>
                     {(viewMode === 'week' ? getWeekDates() : [currentDate]).map((date, dayIdx) => {
                       const isToday = formatDate(date) === formatDate(new Date())
+                      const nonBusiness = isNonBusinessHour(date, time)
                       return (
                         <div
                           key={`${time}-${dayIdx}`}
-                          className={`flex-1 border-r border-gray-200 relative min-w-56 cursor-pointer ${
-                            isToday ? 'bg-blue-50 bg-opacity-30' : 'bg-white'
-                          } hover:bg-gray-50 transition-colors`}
-                          onClick={() => openNewApptWizard(formatDate(date), time)}
+                          className={`flex-1 border-r border-gray-200 relative min-w-56 transition-colors ${
+                            nonBusiness
+                              ? 'bg-gray-100 cursor-default'
+                              : isToday
+                                ? 'bg-blue-50 bg-opacity-30 cursor-pointer hover:bg-gray-50'
+                                : 'bg-white cursor-pointer hover:bg-gray-50'
+                          }`}
+                          style={nonBusiness ? {
+                            backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(0,0,0,0.04) 4px, rgba(0,0,0,0.04) 5px)',
+                          } : undefined}
+                          onClick={() => !nonBusiness && openNewApptWizard(formatDate(date), time)}
                         >
                           {/* Time Blocks */}
                           {getTimeBlocksForDay(date).map((block) => {
