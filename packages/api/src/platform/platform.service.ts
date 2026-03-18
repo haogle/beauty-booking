@@ -1185,4 +1185,570 @@ export class PlatformService {
 
     return this.getSalon(id);
   }
+
+  // ============================================================================
+  // SERVICE CATEGORIES (PLATFORM ADMIN)
+  // ============================================================================
+
+  async createServiceCategory(
+    salonId: string,
+    data: { name: string; sortOrder?: number },
+  ): Promise<any> {
+    const salon = await this.db.get('SELECT id FROM salons WHERE id = ?', [salonId]);
+    if (!salon) throw new NotFoundException(`Salon ${salonId} not found`);
+
+    const id = this.db.generateId();
+    const sortOrder = data.sortOrder ?? 0;
+    const now = new Date().toISOString();
+
+    await this.db.run(
+      `INSERT INTO service_categories (id, salon_id, name, sort_order, is_active, created_at)
+       VALUES (?, ?, ?, ?, 1, ?)`,
+      [id, salonId, data.name, sortOrder, now],
+    );
+
+    const row = await this.db.get('SELECT * FROM service_categories WHERE id = ?', [id]);
+    return this.normalizeServiceCategory(row);
+  }
+
+  async updateServiceCategory(
+    salonId: string,
+    catId: string,
+    data: { name?: string; sortOrder?: number },
+  ): Promise<any> {
+    const category = await this.db.get(
+      'SELECT * FROM service_categories WHERE id = ? AND salon_id = ?',
+      [catId, salonId],
+    );
+    if (!category) {
+      throw new NotFoundException(`Service category ${catId} not found in salon ${salonId}`);
+    }
+
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (data.name !== undefined) {
+      updates.push('name = ?');
+      params.push(data.name);
+    }
+    if (data.sortOrder !== undefined) {
+      updates.push('sort_order = ?');
+      params.push(data.sortOrder);
+    }
+
+    if (updates.length === 0) {
+      return this.normalizeServiceCategory(category);
+    }
+
+    params.push(catId);
+    await this.db.run(
+      `UPDATE service_categories SET ${updates.join(', ')} WHERE id = ?`,
+      params,
+    );
+
+    const row = await this.db.get('SELECT * FROM service_categories WHERE id = ?', [catId]);
+    return this.normalizeServiceCategory(row);
+  }
+
+  async deleteServiceCategory(salonId: string, catId: string): Promise<any> {
+    const category = await this.db.get(
+      'SELECT * FROM service_categories WHERE id = ? AND salon_id = ?',
+      [catId, salonId],
+    );
+    if (!category) {
+      throw new NotFoundException(`Service category ${catId} not found in salon ${salonId}`);
+    }
+
+    await this.db.run('DELETE FROM service_categories WHERE id = ?', [catId]);
+    return this.normalizeServiceCategory(category);
+  }
+
+  // ============================================================================
+  // SERVICES (PLATFORM ADMIN)
+  // ============================================================================
+
+  async createService(salonId: string, data: any): Promise<any> {
+    const salon = await this.db.get('SELECT id FROM salons WHERE id = ?', [salonId]);
+    if (!salon) throw new NotFoundException(`Salon ${salonId} not found`);
+
+    const category = await this.db.get(
+      'SELECT * FROM service_categories WHERE id = ? AND salon_id = ?',
+      [data.categoryId, salonId],
+    );
+    if (!category) {
+      throw new NotFoundException('Service category not found or does not belong to this salon');
+    }
+
+    const id = this.db.generateId();
+    const sortOrder = data.sortOrder ?? 0;
+    const now = new Date().toISOString();
+
+    await this.db.run(
+      `INSERT INTO services (id, salon_id, category_id, name, description, price, duration, cover_image_url, is_active, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+      [
+        id,
+        salonId,
+        data.categoryId,
+        data.name,
+        data.description || null,
+        data.price,
+        data.duration,
+        data.coverImageUrl || null,
+        sortOrder,
+        now,
+        now,
+      ],
+    );
+
+    const row = await this.db.get('SELECT * FROM services WHERE id = ?', [id]);
+    return this.normalizeService(row);
+  }
+
+  async updateService(salonId: string, serviceId: string, data: any): Promise<any> {
+    const service = await this.db.get(
+      'SELECT * FROM services WHERE id = ? AND salon_id = ?',
+      [serviceId, salonId],
+    );
+    if (!service) {
+      throw new NotFoundException(`Service ${serviceId} not found in salon ${salonId}`);
+    }
+
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (data.name !== undefined) {
+      updates.push('name = ?');
+      params.push(data.name);
+    }
+    if (data.description !== undefined) {
+      updates.push('description = ?');
+      params.push(data.description);
+    }
+    if (data.price !== undefined) {
+      updates.push('price = ?');
+      params.push(data.price);
+    }
+    if (data.duration !== undefined) {
+      updates.push('duration = ?');
+      params.push(data.duration);
+    }
+    if (data.categoryId !== undefined) {
+      const category = await this.db.get(
+        'SELECT * FROM service_categories WHERE id = ? AND salon_id = ?',
+        [data.categoryId, salonId],
+      );
+      if (!category) throw new NotFoundException('Service category not found');
+      updates.push('category_id = ?');
+      params.push(data.categoryId);
+    }
+    if (data.sortOrder !== undefined) {
+      updates.push('sort_order = ?');
+      params.push(data.sortOrder);
+    }
+    if (data.coverImageUrl !== undefined) {
+      updates.push('cover_image_url = ?');
+      params.push(data.coverImageUrl);
+    }
+    if (data.isActive !== undefined) {
+      updates.push('is_active = ?');
+      params.push(data.isActive ? 1 : 0);
+    }
+
+    if (updates.length === 0) {
+      return this.normalizeService(service);
+    }
+
+    updates.push('updated_at = ?');
+    params.push(new Date().toISOString());
+    params.push(serviceId);
+    await this.db.run(
+      `UPDATE services SET ${updates.join(', ')} WHERE id = ?`,
+      params,
+    );
+
+    const row = await this.db.get('SELECT * FROM services WHERE id = ?', [serviceId]);
+    return this.normalizeService(row);
+  }
+
+  async deleteService(salonId: string, serviceId: string): Promise<any> {
+    const service = await this.db.get(
+      'SELECT * FROM services WHERE id = ? AND salon_id = ?',
+      [serviceId, salonId],
+    );
+    if (!service) {
+      throw new NotFoundException(`Service ${serviceId} not found in salon ${salonId}`);
+    }
+
+    await this.db.run('DELETE FROM services WHERE id = ?', [serviceId]);
+    return this.normalizeService(service);
+  }
+
+  // ============================================================================
+  // STAFF (PLATFORM ADMIN)
+  // ============================================================================
+
+  async createStaff(salonId: string, data: any): Promise<any> {
+    const salon = await this.db.get('SELECT id FROM salons WHERE id = ?', [salonId]);
+    if (!salon) throw new NotFoundException(`Salon ${salonId} not found`);
+
+    const id = this.db.generateId();
+    const now = new Date().toISOString();
+    const fullName = `${data.firstName || ''} ${data.lastName || ''}`.trim();
+
+    await this.db.run(
+      `INSERT INTO staff (id, salon_id, name, email, phone, role, bio, avatar_url, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+      [
+        id,
+        salonId,
+        fullName,
+        data.email || null,
+        data.phone || null,
+        data.role,
+        data.bio || null,
+        data.avatarUrl || null,
+        now,
+        now,
+      ],
+    );
+
+    const row = await this.db.get('SELECT * FROM staff WHERE id = ?', [id]);
+    return this.normalizeStaff(row);
+  }
+
+  async updateStaff(salonId: string, staffId: string, data: any): Promise<any> {
+    const staff = await this.db.get(
+      'SELECT * FROM staff WHERE id = ? AND salon_id = ?',
+      [staffId, salonId],
+    );
+    if (!staff) {
+      throw new NotFoundException(`Staff ${staffId} not found in salon ${salonId}`);
+    }
+
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (data.firstName !== undefined || data.lastName !== undefined) {
+      const currentName = staff.name || '';
+      const currentParts = currentName.split(' ');
+      const newFirst = data.firstName !== undefined ? data.firstName : (currentParts[0] || '');
+      const newLast = data.lastName !== undefined ? data.lastName : (currentParts.slice(1).join(' ') || '');
+      updates.push('name = ?');
+      params.push(`${newFirst} ${newLast}`.trim());
+    }
+    if (data.email !== undefined) {
+      updates.push('email = ?');
+      params.push(data.email);
+    }
+    if (data.phone !== undefined) {
+      updates.push('phone = ?');
+      params.push(data.phone);
+    }
+    if (data.role !== undefined) {
+      updates.push('role = ?');
+      params.push(data.role);
+    }
+    if (data.bio !== undefined) {
+      updates.push('bio = ?');
+      params.push(data.bio);
+    }
+    if (data.avatarUrl !== undefined) {
+      updates.push('avatar_url = ?');
+      params.push(data.avatarUrl);
+    }
+    if (data.isActive !== undefined) {
+      updates.push('is_active = ?');
+      params.push(data.isActive ? 1 : 0);
+    }
+
+    if (updates.length === 0) {
+      return this.normalizeStaff(staff);
+    }
+
+    updates.push('updated_at = ?');
+    params.push(new Date().toISOString());
+    params.push(staffId);
+    await this.db.run(
+      `UPDATE staff SET ${updates.join(', ')} WHERE id = ?`,
+      params,
+    );
+
+    const row = await this.db.get('SELECT * FROM staff WHERE id = ?', [staffId]);
+    return this.normalizeStaff(row);
+  }
+
+  async deleteStaff(salonId: string, staffId: string): Promise<any> {
+    const staff = await this.db.get(
+      'SELECT * FROM staff WHERE id = ? AND salon_id = ?',
+      [staffId, salonId],
+    );
+    if (!staff) {
+      throw new NotFoundException(`Staff ${staffId} not found in salon ${salonId}`);
+    }
+
+    await this.db.run(
+      'UPDATE staff SET is_active = 0, updated_at = ? WHERE id = ?',
+      [new Date().toISOString(), staffId],
+    );
+
+    const row = await this.db.get('SELECT * FROM staff WHERE id = ?', [staffId]);
+    return this.normalizeStaff(row);
+  }
+
+  // ============================================================================
+  // BUSINESS HOURS (PLATFORM ADMIN)
+  // ============================================================================
+
+  async updateBusinessHours(salonId: string, hours: any): Promise<any> {
+    const salon = await this.db.get('SELECT id FROM salons WHERE id = ?', [salonId]);
+    if (!salon) throw new NotFoundException(`Salon ${salonId} not found`);
+
+    if (hours.length !== 7) {
+      throw new BadRequestException('Must provide business hours for all 7 days');
+    }
+
+    const dayOfWeeks = hours.map((h: any) => h.dayOfWeek).sort();
+    if (!dayOfWeeks.every((d: number, i: number) => d === i)) {
+      throw new BadRequestException('dayOfWeek must be 0-6 (one per day)');
+    }
+
+    const results = [];
+    for (const hour of hours) {
+      const id = this.db.generateId();
+      await this.db.run(
+        `INSERT INTO business_hours (id, salon_id, day_of_week, open_time, close_time, is_closed)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (salon_id, day_of_week) DO UPDATE SET
+           open_time = EXCLUDED.open_time,
+           close_time = EXCLUDED.close_time,
+           is_closed = EXCLUDED.is_closed`,
+        [
+          id,
+          salonId,
+          hour.dayOfWeek,
+          hour.openTime,
+          hour.closeTime,
+          hour.isClosed ? 1 : 0,
+        ],
+      );
+
+      const row = await this.db.get(
+        'SELECT * FROM business_hours WHERE salon_id = ? AND day_of_week = ?',
+        [salonId, hour.dayOfWeek],
+      );
+      results.push(this.normalizeBusinessHour(row));
+    }
+
+    return results;
+  }
+
+  // ============================================================================
+  // BOOKING SETTINGS (PLATFORM ADMIN)
+  // ============================================================================
+
+  async updateBookingSettings(salonId: string, data: any): Promise<any> {
+    const salon = await this.db.get('SELECT id FROM salons WHERE id = ?', [salonId]);
+    if (!salon) throw new NotFoundException(`Salon ${salonId} not found`);
+
+    let settings = await this.db.get(
+      'SELECT * FROM booking_settings WHERE salon_id = ?',
+      [salonId],
+    );
+
+    if (!settings) {
+      const id = this.db.generateId();
+      await this.db.run(
+        'INSERT INTO booking_settings (id, salon_id) VALUES (?, ?)',
+        [id, salonId],
+      );
+    }
+
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (data.bufferMinutes !== undefined) {
+      updates.push('buffer_minutes = ?');
+      params.push(data.bufferMinutes);
+    }
+    if (data.minAdvanceMinutes !== undefined) {
+      updates.push('min_advance_minutes = ?');
+      params.push(data.minAdvanceMinutes);
+    }
+    if (data.reminderBefore !== undefined) {
+      updates.push('reminder_before = ?');
+      params.push(JSON.stringify(data.reminderBefore));
+    }
+    if (data.allowMultiService !== undefined) {
+      updates.push('allow_multi_service = ?');
+      params.push(data.allowMultiService ? 1 : 0);
+    }
+    if (data.allowMultiPerson !== undefined) {
+      updates.push('allow_multi_person = ?');
+      params.push(data.allowMultiPerson ? 1 : 0);
+    }
+    if (data.smsVerification !== undefined) {
+      updates.push('sms_verification = ?');
+      params.push(data.smsVerification ? 1 : 0);
+    }
+    if (data.notificationPhone !== undefined) {
+      updates.push('notification_phone = ?');
+      params.push(data.notificationPhone);
+    }
+    if (data.notificationEmail !== undefined) {
+      updates.push('notification_email = ?');
+      params.push(data.notificationEmail);
+    }
+    if (data.assignmentStrategy !== undefined) {
+      updates.push('assignment_strategy = ?');
+      params.push(data.assignmentStrategy);
+    }
+    if (data.allowGenderFilter !== undefined) {
+      updates.push('allow_gender_filter = ?');
+      params.push(data.allowGenderFilter ? 1 : 0);
+    }
+
+    if (updates.length > 0) {
+      updates.push('updated_at = ?');
+      params.push(new Date().toISOString());
+      params.push(salonId);
+      await this.db.run(
+        `UPDATE booking_settings SET ${updates.join(', ')} WHERE salon_id = ?`,
+        params,
+      );
+    }
+
+    const row = await this.db.get('SELECT * FROM booking_settings WHERE salon_id = ?', [salonId]);
+    return this.normalizeBookingSettings(row);
+  }
+
+  // ============================================================================
+  // APPOINTMENTS (PLATFORM ADMIN)
+  // ============================================================================
+
+  async updateAppointmentStatus(salonId: string, aptId: string, status: string): Promise<any> {
+    const appointment = await this.db.get(
+      'SELECT * FROM appointments WHERE id = ? AND salon_id = ?',
+      [aptId, salonId],
+    );
+    if (!appointment) {
+      throw new NotFoundException(`Appointment ${aptId} not found in salon ${salonId}`);
+    }
+
+    const validStatuses = ['CONFIRMED', 'COMPLETED', 'CANCELLED', 'NO_SHOW', 'IN_PROGRESS'];
+    if (!validStatuses.includes(status)) {
+      throw new BadRequestException(
+        `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
+      );
+    }
+
+    const now = new Date().toISOString();
+    await this.db.run(
+      'UPDATE appointments SET status = ?, updated_at = ? WHERE id = ?',
+      [status, now, aptId],
+    );
+
+    const row = await this.db.get('SELECT * FROM appointments WHERE id = ?', [aptId]);
+    return this.normalizeAppointment(row);
+  }
+
+  // ============================================================================
+  // NORMALIZATION HELPERS
+  // ============================================================================
+
+  private normalizeServiceCategory(row: any): any {
+    return {
+      id: row.id,
+      salonId: row.salon_id,
+      name: row.name,
+      sortOrder: row.sort_order,
+      isActive: row.is_active === 1,
+      createdAt: row.created_at,
+    };
+  }
+
+  private normalizeService(row: any): any {
+    return {
+      id: row.id,
+      salonId: row.salon_id,
+      categoryId: row.category_id,
+      name: row.name,
+      description: row.description,
+      price: row.price,
+      duration: row.duration,
+      coverImageUrl: row.cover_image_url,
+      isActive: row.is_active === 1,
+      sortOrder: row.sort_order,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  private normalizeStaff(row: any): any {
+    return {
+      id: row.id,
+      salonId: row.salon_id,
+      accountId: row.account_id,
+      name: row.name,
+      email: row.email,
+      phone: row.phone,
+      role: row.role,
+      bio: row.bio,
+      avatarUrl: row.avatar_url,
+      isActive: row.is_active === 1,
+      sortOrder: row.sort_order,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  private normalizeBusinessHour(row: any): any {
+    return {
+      id: row.id,
+      salonId: row.salon_id,
+      dayOfWeek: row.day_of_week,
+      openTime: row.open_time,
+      closeTime: row.close_time,
+      isClosed: row.is_closed === 1,
+    };
+  }
+
+  private normalizeBookingSettings(row: any): any {
+    return {
+      id: row.id,
+      salonId: row.salon_id,
+      bufferMinutes: row.buffer_minutes,
+      minAdvanceMinutes: row.min_advance_minutes,
+      reminderBefore: row.reminder_before ? JSON.parse(row.reminder_before) : [],
+      allowMultiService: row.allow_multi_service === 1,
+      allowMultiPerson: row.allow_multi_person === 1,
+      smsVerification: row.sms_verification === 1,
+      notificationPhone: row.notification_phone,
+      notificationEmail: row.notification_email,
+      assignmentStrategy: row.assignment_strategy,
+      allowGenderFilter: row.allow_gender_filter === 1,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  private normalizeAppointment(row: any): any {
+    return {
+      id: row.id,
+      salonId: row.salon_id,
+      clientId: row.client_id,
+      date: row.date,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      status: row.status,
+      totalPrice: row.total_price,
+      totalDuration: row.total_duration,
+      notes: row.notes,
+      internalNotes: row.internal_notes,
+      tip: row.tip,
+      completedAt: row.completed_at,
+      cancelledAt: row.cancelled_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
 }

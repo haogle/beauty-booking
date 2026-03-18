@@ -192,4 +192,124 @@ export class PlatformController {
   async getCustomerAccounts(@Param('id') id: string) {
     return this.platformService.getCustomerAccounts(id);
   }
+
+  // ============================================================================
+  // SERVICE CATEGORIES
+  // ============================================================================
+
+  @Post('salons/:salonId/service-categories')
+  async createServiceCategory(
+    @Param('salonId') salonId: string,
+    @Body() data: { name: string; sortOrder?: number },
+  ) {
+    return this.platformService.createServiceCategory(salonId, data);
+  }
+
+  @Put('salons/:salonId/service-categories/:catId')
+  async updateServiceCategory(
+    @Param('salonId') salonId: string,
+    @Param('catId') catId: string,
+    @Body() data: { name?: string; sortOrder?: number },
+  ) {
+    return this.platformService.updateServiceCategory(salonId, catId, data);
+  }
+
+  @Delete('salons/:salonId/service-categories/:catId')
+  async deleteServiceCategory(
+    @Param('salonId') salonId: string,
+    @Param('catId') catId: string,
+  ) {
+    return this.platformService.deleteServiceCategory(salonId, catId);
+  }
+
+  // ============================================================================
+  // SERVICES
+  // ============================================================================
+
+  @Post('salons/:salonId/services')
+  async createService(
+    @Param('salonId') salonId: string,
+    @Body() data: any,
+  ) {
+    return this.platformService.createService(salonId, data);
+  }
+
+  @Put('salons/:salonId/services/:serviceId')
+  async updateService(
+    @Param('salonId') salonId: string,
+    @Param('serviceId') serviceId: string,
+    @Body() data: any,
+  ) {
+    return this.platformService.updateService(salonId, serviceId, data);
+  }
+
+  @Delete('salons/:salonId/services/:serviceId')
+  async deleteService(
+    @Param('salonId') salonId: string,
+    @Param('serviceId') serviceId: string,
+  ) {
+    return this.platformService.deleteService(salonId, serviceId);
+  }
+
+  // ============================================================================
+  // STAFF MANAGEMENT
+  // ============================================================================
+
+  @Post('salons/:salonId/staff')
+  async createStaff(
+    @Param('salonId') salonId: string,
+    @Body() data: any,
+  ) {
+    return this.platformService.createStaff(salonId, data);
+  }
+
+  @Put('salons/:salonId/staff/:staffId')
+  async updateStaff(
+    @Param('salonId') salonId: string,
+    @Param('staffId') staffId: string,
+    @Body() data: any,
+  ) {
+    return this.platformService.updateStaff(salonId, staffId, data);
+  }
+
+  @Delete('salons/:salonId/staff/:staffId')
+  async deleteStaff(
+    @Param('salonId') salonId: string,
+    @Param('staffId') staffId: string,
+  ) {
+    return this.platformService.deleteStaff(salonId, staffId);
+  }
+
+  // ============================================================================
+  // SETTINGS
+  // ============================================================================
+
+  @Put('salons/:salonId/business-hours')
+  async updateBusinessHours(
+    @Param('salonId') salonId: string,
+    @Body() hours: any,
+  ) {
+    return this.platformService.updateBusinessHours(salonId, hours);
+  }
+
+  @Put('salons/:salonId/booking-settings')
+  async updateBookingSettings(
+    @Param('salonId') salonId: string,
+    @Body() data: any,
+  ) {
+    return this.platformService.updateBookingSettings(salonId, data);
+  }
+
+  // ============================================================================
+  // APPOINTMENTS
+  // ============================================================================
+
+  @Put('salons/:salonId/appointments/:aptId/status')
+  async updateAppointmentStatus(
+    @Param('salonId') salonId: string,
+    @Param('aptId') aptId: string,
+    @Body() data: { status: string },
+  ) {
+    return this.platformService.updateAppointmentStatus(salonId, aptId, data.status);
+  }
 }
