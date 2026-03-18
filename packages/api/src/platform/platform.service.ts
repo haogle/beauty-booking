@@ -1187,6 +1187,97 @@ export class PlatformService {
   }
 
   // ============================================================================
+  // READ-ONLY GETTERS FOR INDIVIDUAL SALON DATA
+  // ============================================================================
+
+  async getSalonServiceCategories(salonId: string): Promise<any[]> {
+    const salon = await this.db.get('SELECT id FROM salons WHERE id = ?', [salonId]);
+    if (!salon) throw new NotFoundException(`Salon ${salonId} not found`);
+
+    const categories = await this.db.all<any>(
+      `SELECT id, salon_id, name, sort_order, is_active, created_at
+       FROM service_categories
+       WHERE salon_id = ?
+       ORDER BY sort_order ASC`,
+      [salonId],
+    );
+
+    const result = [];
+    for (const cat of categories) {
+      const services = await this.db.all<any>(
+        `SELECT id, name, description, price, duration, cover_image_url, is_active, sort_order
+         FROM services
+         WHERE category_id = ? AND salon_id = ?
+         ORDER BY sort_order ASC`,
+        [cat.id, salonId],
+      );
+      result.push({
+        id: cat.id,
+        name: cat.name,
+        sortOrder: cat.sort_order,
+        isActive: cat.is_active === 1,
+        services: services.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          price: s.price,
+          duration: s.duration,
+          coverImageUrl: s.cover_image_url,
+          isActive: s.is_active === 1,
+          sortOrder: s.sort_order,
+          categoryId: cat.id,
+        })),
+      });
+    }
+    return result;
+  }
+
+  async getSalonBusinessHours(salonId: string): Promise<any[]> {
+    const salon = await this.db.get('SELECT id FROM salons WHERE id = ?', [salonId]);
+    if (!salon) throw new NotFoundException(`Salon ${salonId} not found`);
+
+    const hours = await this.db.all<any>(
+      `SELECT id, day_of_week, open_time, close_time, is_closed
+       FROM business_hours
+       WHERE salon_id = ?
+       ORDER BY day_of_week ASC`,
+      [salonId],
+    );
+
+    return hours.map((h: any) => ({
+      id: h.id,
+      dayOfWeek: h.day_of_week,
+      openTime: h.open_time,
+      closeTime: h.close_time,
+      isClosed: h.is_closed === 1,
+    }));
+  }
+
+  async getSalonBookingSettings(salonId: string): Promise<any> {
+    const salon = await this.db.get('SELECT id FROM salons WHERE id = ?', [salonId]);
+    if (!salon) throw new NotFoundException(`Salon ${salonId} not found`);
+
+    const settings = await this.db.get<any>(
+      `SELECT * FROM booking_settings WHERE salon_id = ?`,
+      [salonId],
+    );
+
+    if (!settings) return null;
+
+    return {
+      bufferMinutes: settings.buffer_minutes,
+      minAdvanceMinutes: settings.min_advance_minutes,
+      allowMultiService: settings.allow_multi_service === 1,
+      allowMultiPerson: settings.allow_multi_person === 1,
+      smsVerification: settings.sms_verification === 1,
+      assignmentStrategy: settings.assignment_strategy,
+      allowGenderFilter: settings.allow_gender_filter === 1,
+      notificationPhone: settings.notification_phone,
+      notificationEmail: settings.notification_email,
+    };
+  }
+
+  // ============================================================================
   // SERVICE CATEGORIES (PLATFORM ADMIN)
   // ============================================================================
 

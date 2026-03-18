@@ -224,8 +224,9 @@ export default function SalonDetailPage() {
     if (!id) return;
     try {
       const response = await api.get(`/api/v1/platform/salons/${id}/appointments`);
-      const data = response.data?.data || response.data;
-      setBookings(Array.isArray(data) ? data : []);
+      const result = response.data?.data || response.data;
+      const bookingsArr = result.data || result;
+      setBookings(Array.isArray(bookingsArr) ? bookingsArr : []);
     } catch (err) {
       console.error('Failed to load bookings:', err);
     }
@@ -721,11 +722,11 @@ export default function SalonDetailPage() {
                   <tbody>
                     {filteredBookings.map((booking) => (
                       <tr key={booking.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-4 text-sm">{booking.customerName}</td>
-                        <td className="py-3 px-4 text-sm">{booking.service}</td>
-                        <td className="py-3 px-4 text-sm">{booking.date} {booking.time}</td>
-                        <td className="py-3 px-4 text-sm">{booking.staffAssigned || '-'}</td>
-                        <td className="py-3 px-4 text-sm font-medium">{salon.currency} {booking.price}</td>
+                        <td className="py-3 px-4 text-sm">{booking.customerName || '-'}</td>
+                        <td className="py-3 px-4 text-sm">{booking.serviceName || '-'}</td>
+                        <td className="py-3 px-4 text-sm">{booking.date} {booking.startTime || ''}</td>
+                        <td className="py-3 px-4 text-sm">{booking.staffName || '-'}</td>
+                        <td className="py-3 px-4 text-sm font-medium">{salon.currency} {booking.totalPrice || 0}</td>
                         <td className="py-3 px-4 text-sm">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             booking.status === 'CONFIRMED' ? 'bg-green-100 text-green-800' :
